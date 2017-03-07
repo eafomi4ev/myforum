@@ -6,7 +6,7 @@ CREATE TABLE "Forum"
     slug TEXT NOT NULL,
     posts INTEGER,
     threads INTEGER,
-    CONSTRAINT forum___fk_user FOREIGN KEY ("user") REFERENCES "User" (nickname)
+    CONSTRAINT forum___fk_user FOREIGN KEY ("user") REFERENCES Users (nickname)
 );
 COMMENT ON COLUMN "Forum".title IS 'Название форума.';
 COMMENT ON COLUMN "Forum"."user" IS 'Nickname пользователя, который отвечает за форум (уникальное поле).';

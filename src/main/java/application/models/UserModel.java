@@ -8,6 +8,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class UserModel {
 
+    private int id;
+
     // Имя пользователя (уникальное поле). Данное поле допускает только латиницу, цифры и знак подчеркивания.
     // Сравнение имени регистронезависимо.
     // это поле - id в БД
@@ -22,14 +24,21 @@ public class UserModel {
     //Почтовый адрес пользователя (уникальное поле).
     private String email;
 
-    @JsonCreator
-    UserModel(@JsonProperty("nickname") String nickname, @JsonProperty("fullname") String fullname,
-              @JsonProperty("about") String about, @JsonProperty("email") String email) {
+    public UserModel(){}
 
+    @JsonCreator
+    public UserModel(@JsonProperty("id") int id, @JsonProperty("nickname") String nickname, @JsonProperty("fullname") String fullname,
+                     @JsonProperty("about") String about, @JsonProperty("email") String email) {
+
+        this.id = id;
         this.nickname = nickname;
         this.fullname = fullname;
         this.about = about;
         this.email = email;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     public void setNickname(String nickname) {
@@ -46,6 +55,10 @@ public class UserModel {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public int getId() {
+        return id;
     }
 
     public String getNickname() {
