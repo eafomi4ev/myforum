@@ -13,46 +13,45 @@ import org.springframework.web.bind.annotation.*;
  */
 
 @RestController
-@RequestMapping(path = "/user/{nickname}")
+@RequestMapping(path = "/api/user/{nickName}")
 public class UserController {
 
     private final UserDAO userServiceDAO;
 
-//    private final JdbcTemplate jdbcTemplate;
 
     UserController(JdbcTemplate jdbcTemplate) {
-        this.userServiceDAO = new UserDAO();
-//        this.jdbcTemplate = jdbcTemplate;
+        this.userServiceDAO = new UserDAO(jdbcTemplate);
     }
 
 //    UserController(){}
 
     @RequestMapping(path = "/create", method = RequestMethod.POST, produces = "application/json", consumes = "application/json")
-    public ResponseEntity<UserModel> create(@PathVariable("nickname") String nickName, @RequestBody UserModel user) {
+    public ResponseEntity create(@PathVariable("nickName") String nickName, @RequestBody UserModel user) {
 
         try {
+            user.setNickname(nickName);
             userServiceDAO.insert(user);
+            return ResponseEntity.status(HttpStatus.CREATED).body(user);//201
         } catch (DuplicateKeyException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(userServiceDAO.getByNick(nickName));
-        }
-        return ResponseEntity.status(HttpStatus.CREATED).body(userServiceDAO.getByNick(nickName));
-
-    }
-
-    @RequestMapping(path = "/profile", method = RequestMethod.GET, produces = "application/json", consumes = "application/json")
-    public ResponseEntity<UserModel> profile(@PathVariable("nickname") String nickName) {
-        UserModel user = null;
-        try {
-            user = userServiceDAO.getByNick(nickName);
-
-        } catch (DuplicateKeyException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(userServiceDAO.getByNick(nickName));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(userServiceDAO.get(user));//409
         }
 
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(userServiceDAO.getByNick(nickName));
-
     }
+
+//    @RequestMapping(path = "/profile", method = RequestMethod.GET, produces = "application/json", consumes = "application/json")
+//    public ResponseEntity profile(@PathVariable("nickname") String nickName) {
+//        List<UserModel> users = null;
+//        try {
+//            users = userServiceDAO.get(users);
+////            users.setNickname(nickName);
+//        } catch (DuplicateKeyException e) {
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Пользователь отсутствует в системе.");//404
+//        }
+//
+//        return ResponseEntity.ok().body(userServiceDAO.get(users));//200
+//
+//    }
 
 
 }
