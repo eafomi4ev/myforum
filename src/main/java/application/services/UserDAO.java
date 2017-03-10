@@ -2,6 +2,7 @@ package application.services;
 
 import application.models.UserModel;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -10,12 +11,13 @@ import org.springframework.util.StringUtils;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Created by egor on 06.03.17.
  */
 @Service
-public class UserDAO {
+public final class UserDAO {
 
     private JdbcTemplate jdbcTemplate;
 
@@ -26,7 +28,6 @@ public class UserDAO {
     public final void insert(final UserModel user) {
         String sql = "INSERT INTO users (nickname, fullname, about, email) VALUES(?, ?, ?, ?)";
         jdbcTemplate.update(sql, user.getNickname(), user.getFullname(), user.getAbout(), user.getEmail());
-
     }
 
     public final UserModel get(final String nickName) {
@@ -46,12 +47,21 @@ public class UserDAO {
 //    }
 
     public final UserModel updateUserProfile(final String nickName, final UserModel user) {
+        UserModel newUser = null;
+        try {
+            newUser = get(nickName);
+        } catch (EmptyResultDataAccessException e){
+            return null;
+        }
 
-        StringBuffer values = new StringBuffer("VALUES (");
+        if (Objects.isNull(newUser)) {
+            return null;
+        }
+
         StringBuffer sql = new StringBuffer("UPDATE users SET ");
         boolean isFirstArgumentAdded = false;
-//        List<String> addedArgument = new ArrayList<>();
-        UserModel newUser = get(nickName);
+//        UserModel newUser = get(nickName);
+
         /*Этот if не перемещать, другие if перед ним не ставить, тк в первом if гарантировано isFirstArgumentAdded = false*/
         if (!StringUtils.isEmpty(user.getNickname())) {
             sql.append("nickname = '" + user.getNickname() + "',");
@@ -77,6 +87,12 @@ public class UserDAO {
 
         }
 
+        if (!isFirstArgumentAdded) {
+//                UserModel tmpUser = get(nickName);
+            return newUser;
+
+        }
+
         sql.deleteCharAt(sql.length() - 1);
 
         sql.append(" WHERE nickname = '").append(nickName).append("'");
@@ -87,14 +103,8 @@ public class UserDAO {
             return null;
         }
 
-//        UserModel newUser = get(user.getNickname());
         return newUser;
-//        for (String argument: addedArgument) {
-//            if argument.equals("")
-//        }
 
-
-//        String sql = "UPDATE users SET nickname = ?, fullname = ?, about = ?, email = ?"
     }
 
 

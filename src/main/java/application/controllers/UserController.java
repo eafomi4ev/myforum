@@ -1,9 +1,8 @@
 package application.controllers;
 
+import application.support.ResponseMsg;
 import application.models.UserModel;
 import application.services.UserDAO;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
@@ -18,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping(path = "/api/user/{nickName}")
-public class UserController {
+public final class UserController {
 
     private final UserDAO userServiceDAO;
 
@@ -65,12 +64,12 @@ public class UserController {
 
     @RequestMapping(path = "/profile", method = RequestMethod.POST, produces = "application/json", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity profile(@PathVariable("nickName") String nickName, @RequestBody UserModel userDataForUpfdate) {
-        System.out.print(nickName);
 
         try {
+            System.out.print(nickName);
             UserModel user = userServiceDAO.updateUserProfile(nickName, userDataForUpfdate);
             if (user == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Пользователь отсутствует в системе.");//404
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Пользователь отсутствует в системе."));//404
             } else {
                 return ResponseEntity.ok(user);//200
             }
@@ -80,15 +79,7 @@ public class UserController {
 
     }
 
-    private final class ResponseMsg {
-        @JsonProperty
-        private String msg;
 
-        @JsonCreator
-        ResponseMsg(@JsonProperty String msg) {
-            this.msg = msg;
-        }
-    }
 
 }
 
