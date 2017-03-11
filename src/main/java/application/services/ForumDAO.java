@@ -14,13 +14,17 @@ import java.util.List;
 public final class ForumDAO {
 
     private JdbcTemplate jdbcTemplate;
+    private UserDAO userServiceDAO;
 
-    public ForumDAO(JdbcTemplate jdbcTemplate) {
+    public ForumDAO(JdbcTemplate jdbcTemplate, UserDAO userServiceDAO) {
         this.jdbcTemplate = jdbcTemplate;
+        this.userServiceDAO = userServiceDAO;
     }
 
     public final void create(ForumModel forum) {
-        String sql = "INSERT INTO forums (title, user_nick, slug, posts, threads) VALUES(?, ?, ?, ?, ?)";
+
+        String sql = "INSERT INTO forums (title, user_nick, slug, posts, threads) VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, ?)";
+
         jdbcTemplate.update(sql, forum.getTitle(), forum.getUser(), forum.getSlug(), forum.getPosts(), forum.getThreads());
     }
 

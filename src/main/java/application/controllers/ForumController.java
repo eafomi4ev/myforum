@@ -1,18 +1,16 @@
 package application.controllers;
 
-import application.support.ResponseMsg;
 import application.models.ForumModel;
 import application.services.ForumDAO;
+import application.services.UserDAO;
+import application.support.ResponseMsg;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * Created by egor on 06.03.17.
@@ -22,9 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(path = "/api/forum")
 public final class ForumController {
     private ForumDAO forumServiceDAO;
+    private UserDAO userServiceDAO;
 
-    ForumController(JdbcTemplate jdbcTemplate) {
-        this.forumServiceDAO = new ForumDAO(jdbcTemplate);
+    ForumController(JdbcTemplate jdbcTemplate, UserDAO userServiceDAO) {
+        this.forumServiceDAO = new ForumDAO(jdbcTemplate, userServiceDAO);
     }
 
     @RequestMapping(path = "/create", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -32,16 +31,37 @@ public final class ForumController {
 
         try {
             forumServiceDAO.create(forum);
-            return ResponseEntity.status(HttpStatus.CREATED).body(forum);//201
+//            JSONObject json = new JSONObject();
+//            json.put("title", forum.getTitle());
+//            json.put("user", forum.getUser());
+//            json.put("slug", forum.getSlug());
+            return ResponseEntity.status(HttpStatus.CREATED).body(forumServiceDAO.getbySlug(forum.getSlug()));//201
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getbySlug(forum.getSlug()));//409
         } catch (DataIntegrityViolationException exception) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Пользователь отсутствует в системе."));//404
 
         }
-
-
     }
+
+    //Получение информации о форуме по его идентификатору.
+    @RequestMapping(path = "/{slug}/details", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity details(@PathVariable("slug") String slug) {
+        try {
+            return ResponseEntity.ok(forumServiceDAO.getbySlug(slug));//200
+        } catch (IndexOutOfBoundsException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Форум отсутствует в системе."));//404
+        }
+//        try {
+//        } catch (DuplicateKeyException e) {
+//            return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getbySlug(forum.getSlug()));//409
+//        } catch (DataIntegrityViolationException exception) {
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Пользователь отсутствует в системе."));//404
+//
+//        }
+    }
+
+
 
 
 
