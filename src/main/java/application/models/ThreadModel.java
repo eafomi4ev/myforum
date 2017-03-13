@@ -2,6 +2,7 @@ package application.models;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.sql.Timestamp;
@@ -10,6 +11,8 @@ import java.sql.Timestamp;
  * Created by egor on 11.03.17.
  */
 
+//Аннотация исключает примитивы со значением 0 из сериализации. TODO: Проверить сериализацию, когда надо вернуть нулевое значение
+@JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class ThreadModel {
     private int id;
     private String title;
@@ -19,7 +22,6 @@ public class ThreadModel {
     private int votes;
     private String slug;
 
-    //    @JsonFormat(shape=JsonFormat.Shape.STRING)
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")
     private Timestamp created;
 

@@ -22,15 +22,15 @@ public final class ForumDAO {
         this.userServiceDAO = userServiceDAO;
     }
 
-    public final void create(ForumModel forum) {
+    public void create(ForumModel forum) {
 
-        String sql = "INSERT INTO forums (title, user_nick, slug, posts, threads) VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, ?)";
+        final String sql = "INSERT INTO forums (title, user_nick, slug, posts, threads) VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, ?)";
 
         jdbcTemplate.update(sql, forum.getTitle(), forum.getUser(), forum.getSlug(), forum.getPosts(), forum.getThreads());
     }
 
-    public final ForumModel getbySlug(String slug) {
-        String sql = "SELECT * FROM forums WHERE LOWER(slug) = LOWER(?)";
+    public ForumModel getbySlug(String slug) {
+        final String sql = "SELECT * FROM forums WHERE LOWER(slug) = LOWER(?)";
         List<ForumModel> forums = jdbcTemplate.query(sql, new Object[]{slug}, new ForumDAO.ForumModelMapper());
 
 
@@ -39,7 +39,7 @@ public final class ForumDAO {
     }
 
 
-    public final void createThread(ThreadModel thread) {
+    public void createThread(ThreadModel thread) {
         String sql = "INSERT INTO thread (title, author, forum, message, votes, slug, created) " +
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(users.nickname)=LOWER(?)), " +
                 "(SELECT slug FROM forums WHERE LOWER(forums.slug)=LOWER(?)), ?, ? , ? , ?)";
@@ -54,27 +54,9 @@ public final class ForumDAO {
         jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
     }
 
-    public final List<ThreadModel> getThreadBySlug(String slug) {
-        String sql = "SELECT * FROM thread WHERE LOWER(slug) = LOWER(?)";
-        return jdbcTemplate.query(sql, new Object[]{slug}, new ForumDAO.ThreadModelMapper());
-
-
-//        ObjectMapper objectMapper = new ObjectMapper();
-//        //Set pretty printing of json
-//        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-//
-//        //Disable the timestamp serialization
-//        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-//
-//        String json = null;
-//        try {
-//            json = objectMapper.writeValueAsString(thread);
-//        } catch (JsonProcessingException e) {
-//            e.printStackTrace();
-//        }
-//        System.out.println("2. Convert Person to JSON - Date without timestamp");
-//        System.out.println(json);
-
+    public List<ThreadModel> getThread(String title, String nickname) {
+        String sql = "SELECT * FROM thread WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?)";
+        return jdbcTemplate.query(sql, new Object[]{title, nickname}, new ForumDAO.ThreadModelMapper());
     }
 
 
@@ -96,9 +78,6 @@ public final class ForumDAO {
         @Override
         public ThreadModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
 
-//            final Timestamp createdTimeInISO = resultSet.getTimestamp("created");
-//            final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-
             ThreadModel thread = new ThreadModel(resultSet.getInt("id"),
                     resultSet.getString("title"),
                     resultSet.getString("author"),
@@ -106,9 +85,7 @@ public final class ForumDAO {
                     resultSet.getString("message"),
                     resultSet.getInt("votes"),
                     resultSet.getString("slug"),
-                    resultSet.getTimestamp("created")
-//                    dateFormat.format(createdTimeInISO)
-            );
+                    resultSet.getTimestamp("created"));
 
             return thread;
 
