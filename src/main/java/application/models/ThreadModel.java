@@ -19,8 +19,8 @@ public class ThreadModel {
     private int votes;
     private String slug;
 
-//    @JsonFormat(shape=JsonFormat.Shape.STRING, pattern="yyyy-MM-dd HH:mm a z")
-    @JsonFormat(shape=JsonFormat.Shape.STRING)
+    //    @JsonFormat(shape=JsonFormat.Shape.STRING)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")
     private Timestamp created;
 
     @JsonCreator
