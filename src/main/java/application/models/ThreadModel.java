@@ -1,10 +1,15 @@
 package application.models;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.sql.Timestamp;
 
 /**
  * Created by egor on 11.03.17.
  */
+
 public class ThreadModel {
     private int id;
     private String title;
@@ -13,13 +18,17 @@ public class ThreadModel {
     private String message;
     private int votes;
     private String slug;
-    private String created;
 
+//    @JsonFormat(shape=JsonFormat.Shape.STRING, pattern="yyyy-MM-dd HH:mm a z")
+    @JsonFormat(shape=JsonFormat.Shape.STRING)
+    private Timestamp created;
+
+    @JsonCreator
     public ThreadModel(@JsonProperty("id") int id,
                        @JsonProperty("title") String title, @JsonProperty("author") String author,
                        @JsonProperty("forum") String forum, @JsonProperty("message") String message,
                        @JsonProperty("votes") int votes, @JsonProperty("slug") String slug,
-                       @JsonProperty("created") String created) {
+                       @JsonProperty("created") Timestamp created) {
 
         this.id = id;
         this.title = title;
@@ -87,11 +96,11 @@ public class ThreadModel {
         this.slug = slug;
     }
 
-    public String getCreated() {
+    public Timestamp getCreated() {
         return created;
     }
 
-    public void setCreated(String created) {
+    public void setCreated(Timestamp created) {
         this.created = created;
     }
 }

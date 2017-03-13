@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * Created by egor on 06.03.17.
  */
@@ -68,7 +70,8 @@ public final class ForumController {
         try {
             thread.setSlug(slug);
             forumServiceDAO.createThread(thread);
-            return ResponseEntity.status(HttpStatus.CREATED).body(thread);//201
+            List<ThreadModel> threads = forumServiceDAO.getThreadBySlug(slug);
+            return ResponseEntity.status(HttpStatus.CREATED).body(threads.get(0));//201
         } catch (IndexOutOfBoundsException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Форум отсутствует в системе."));//404
         } catch (DuplicateKeyException e) {
