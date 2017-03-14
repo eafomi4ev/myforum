@@ -11,8 +11,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.List;
 
 /**
@@ -22,11 +26,11 @@ import java.util.List;
 @RestController
 @RequestMapping(path = "/api/forum")
 public final class ForumController {
+
     private ForumDAO forumServiceDAO;
-    private UserDAO userServiceDAO;
 
     ForumController(JdbcTemplate jdbcTemplate, UserDAO userServiceDAO) {
-        this.forumServiceDAO = new ForumDAO(jdbcTemplate, userServiceDAO);
+        this.forumServiceDAO = new ForumDAO(jdbcTemplate);
     }
 
     @RequestMapping(path = "/create", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -62,18 +66,46 @@ public final class ForumController {
             }
 
             forumServiceDAO.createThread(thread);
-            List<ThreadModel> threads = forumServiceDAO.getThread(thread.getTitle(), thread.getAuthor()); //TODO: переименовать метод в getThreadsBySlug
-//            threads.get(0).setNullInSlug();
+            List<ThreadModel> threads = forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor());
             return ResponseEntity.status(HttpStatus.CREATED).body(threads.get(0));//201
         } catch (IndexOutOfBoundsException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Форум отсутствует в системе."));//404
         } catch (DuplicateKeyException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getThread(thread.getTitle(), thread.getAuthor()));//409
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor()));//409
         }
     }
 
+    //Получение информации о ветках форума по заданным параметрам. Если desc = true, то created д.б. <= since.
+    @RequestMapping(path = "/{slug}/threads", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity getThreadsList(@PathVariable("slug") String forumSlug,
+                                         @RequestParam(value = "limit", required = false) String limit,
+                                         @RequestParam(value = "since", required = false) String tmpSince,
+                                         @RequestParam(value = "desc", required = false) boolean desc) {
+
+        List<ThreadModel> threadList = forumServiceDAO.getThreads(forumSlug);
+        if (threadList.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Timestamp since = null;
+        if (!StringUtils.isEmpty(tmpSince)) //Todo: перенести этот блок кода в ForumDAO
+        {
+            try {
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX");
+                since = new Timestamp(dateFormat.parse(tmpSince).getTime());
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+        }
+
+        threadList = forumServiceDAO.getThreads(forumSlug, limit, since, desc);
+        if (!threadList.isEmpty()) {
+            return ResponseEntity.ok(threadList);
+        } else {
+            return ResponseEntity.status(HttpStatus.OK).body("[]");//404
+        }
 
 
-
-
+    }
 }
+

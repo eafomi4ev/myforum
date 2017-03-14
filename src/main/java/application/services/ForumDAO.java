@@ -4,9 +4,11 @@ import application.models.ForumModel;
 import application.models.ThreadModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.util.StringUtils;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.List;
 
 /**
@@ -15,11 +17,9 @@ import java.util.List;
 public final class ForumDAO {
 
     private JdbcTemplate jdbcTemplate;
-    private UserDAO userServiceDAO;
 
-    public ForumDAO(JdbcTemplate jdbcTemplate, UserDAO userServiceDAO) {
+    public ForumDAO(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.userServiceDAO = userServiceDAO;
     }
 
     public void create(ForumModel forum) {
@@ -35,7 +35,6 @@ public final class ForumDAO {
 
 
         return forums.get(0);
-//        return jdbcTemplate.query("SELECT * FROM forums WHERE LOWER(slug) = LOWER(?)", new Object[]{slug}, new ForumDAO.ForumModelMapper());
     }
 
 
@@ -44,19 +43,46 @@ public final class ForumDAO {
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(users.nickname)=LOWER(?)), " +
                 "(SELECT slug FROM forums WHERE LOWER(forums.slug)=LOWER(?)), ?, ? , ? , ?)";
 
-//                "INSERT INTO thread (title, author, forum, message, votes, slug, created) " +
-//                "VALUES(?, (SELECT nickname, slug FROM users JOIN forums on users.nickname = forums.user_nick " +
-//                "WHERE LOWER(nickname)=LOWER(?) AND  LOWER(slug)=LOWER(?)), ?, DEFAULT , DEFAULT , ?)";
-
-//        String sql = "INSERT INTO thread (title, author, forum, message, votes, slug, created) " +
-//                "VALUES(?, ?, ?, ?, ?, ?, ?)";
-//        Timestamp createdTimeInISO = Timestamp.valueOf(LocalDateTime.parse(thread.getCreated(), DateTimeFormatter.ISO_DATE_TIME));
         jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
     }
 
-    public List<ThreadModel> getThread(String title, String nickname) {
+    public List<ThreadModel> getThreads(String title, String nickname) {
         String sql = "SELECT * FROM thread WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?)";
         return jdbcTemplate.query(sql, new Object[]{title, nickname}, new ForumDAO.ThreadModelMapper());
+    }
+
+    public List<ThreadModel> getThreads(String forum) {
+        String sql = "SELECT * FROM thread WHERE LOWER(forum) = LOWER(?) ";
+        return jdbcTemplate.query(sql, new Object[]{forum}, new ForumDAO.ThreadModelMapper());
+    }
+
+    public List<ThreadModel> getThreads(String slug, String limit, Timestamp since, boolean desc) {
+        StringBuffer sql = new StringBuffer("SELECT * FROM thread WHERE lower(forum) = lower(?)");
+        if (!StringUtils.isEmpty(since)) {
+            if (desc) {
+                sql.append(" AND created <= '").append(since).append("'::TIMESTAMP").append(" ORDER BY created").append(" DESC");
+            } else {
+                sql.append(" AND created >= '").append(since).append("'::TIMESTAMP").append(" ORDER BY created");
+            }
+        } else {
+            if (desc) {
+                sql.append(" ORDER BY created").append(" DESC");
+            } else {
+                sql.append(" ORDER BY created");
+            }
+        }
+
+        if (!StringUtils.isEmpty(limit)) {
+            sql.append(" LIMIT ").append(limit);
+        }
+
+        if (sql.charAt(sql.length() - 1) == ',') {
+            sql.deleteCharAt(sql.length() - 1);
+        }
+
+        System.out.println(sql);
+        List<ThreadModel> list = jdbcTemplate.query(sql.toString(), new Object[]{slug}, new ForumDAO.ThreadModelMapper());
+        return list;
     }
 
 
