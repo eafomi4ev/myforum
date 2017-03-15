@@ -26,14 +26,21 @@ public class ThreadController {
     }
 
     @RequestMapping(path = "/{threadId}/create")
-    public ResponseEntity create(@RequestBody List<PostModel> posts, @PathVariable("threadId") int threadId) {
+    public ResponseEntity create(@RequestBody List<PostModel> posts, @PathVariable("threadId") String threadId) {
+        int id = 0;
+        try {
+            id = Integer.parseInt(threadId);
+        } catch (NumberFormatException e){
+            System.out.print(threadId);
+        }
+
         for (PostModel post : posts) {
-            post.setThread(threadId);
+            post.setThread(id);
         }
 
         threadServiceDAO.createPost(posts);
 
-        List<PostModel> list=threadServiceDAO.getPostsInThread(threadId);
+        List<PostModel> list=threadServiceDAO.getPostsInThread(id);
         return ResponseEntity.status(HttpStatus.CREATED).body(list);
     }
 

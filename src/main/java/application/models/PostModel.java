@@ -15,8 +15,8 @@ public class PostModel {
     private int parent;
     private String author;
     private String message;
-    
-    private boolean isEdited;
+
+    private Boolean isEdited;
 
     private String forum;
     private int thread;
@@ -71,8 +71,8 @@ public class PostModel {
         this.message = message;
     }
 
-    public boolean isEdited() {
-        return isEdited;
+    public boolean getIsEdited() {
+        return this.isEdited;
     }
 
     public void setIsEdited(boolean isEdited) {

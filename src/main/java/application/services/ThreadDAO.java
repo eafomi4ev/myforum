@@ -38,7 +38,7 @@ public final class ThreadDAO {
         System.out.println(sql.toString());
 
         jdbcTemplate.update(sql.toString(), posts.get(0).getParent(), posts.get(0).getAuthor(), posts.get(0).getMessage(),
-                posts.get(0).isEdited(), posts.get(0).getThread(), posts.get(0).getThread());
+                posts.get(0).getIsEdited(), posts.get(0).getThread(), posts.get(0).getThread());
 
     }
 
