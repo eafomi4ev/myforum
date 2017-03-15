@@ -1,6 +1,6 @@
 CREATE TABLE forums
 (
-    id INTEGER DEFAULT nextval('"Forum_id_seq"'::regclass) PRIMARY KEY NOT NULL,
+    id INTEGER DEFAULT nextval(''"Forum_id_seq"''::regclass) PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
     user_nick CITEXT NOT NULL,
     slug CITEXT NOT NULL,
@@ -8,17 +8,35 @@ CREATE TABLE forums
     threads INTEGER DEFAULT 0,
     CONSTRAINT forums_users_nickname_fk FOREIGN KEY (user_nick) REFERENCES users (nickname)
 );
-COMMENT ON COLUMN forums.title IS 'Название форума.';
-COMMENT ON COLUMN forums.user_nick IS 'Nickname пользователя, который отвечает за форум (уникальное поле).';
-COMMENT ON COLUMN forums.slug IS 'Человекопонятный URL (https://ru.wikipedia.org/wiki/%D0%A1%D0%B5%D0%BC%D0%B0%D0%BD%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_URL).';
-COMMENT ON COLUMN forums.posts IS 'Общее кол-во сообщений в данном форуме.';
-COMMENT ON COLUMN forums.threads IS 'Общее кол-во ветвей обсуждения в данном форуме.';
+COMMENT ON COLUMN forums.title IS ''Название форума.'';
+COMMENT ON COLUMN forums.user_nick IS ''Nickname пользователя, который отвечает за форум (уникальное поле).'';
+COMMENT ON COLUMN forums.slug IS ''Человекопонятный URL (https://ru.wikipedia.org/wiki/%D0%A1%D0%B5%D0%BC%D0%B0%D0%BD%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9_URL).'';
+COMMENT ON COLUMN forums.posts IS ''Общее кол-во сообщений в данном форуме.'';
+COMMENT ON COLUMN forums.threads IS ''Общее кол-во ветвей обсуждения в данном форуме.'';
 CREATE UNIQUE INDEX forums_slug_uindex ON forums (slug);
-
-
-CREATE TABLE thread
+CREATE TABLE posts
 (
-    id INTEGER DEFAULT nextval('thread_id_seq'::regclass) PRIMARY KEY NOT NULL,
+    id INTEGER DEFAULT nextval(''posts_id_seq''::regclass) PRIMARY KEY NOT NULL,
+    parent INTEGER,
+    author CITEXT NOT NULL,
+    message TEXT NOT NULL,
+    isedited BOOLEAN DEFAULT false,
+    forum CITEXT,
+    thread INTEGER,
+    created TIMESTAMP DEFAULT now(),
+    CONSTRAINT posts_users_nickname_fk FOREIGN KEY (author) REFERENCES users (nickname),
+    CONSTRAINT posts_forums_slug_fk FOREIGN KEY (forum) REFERENCES forums (slug),
+    CONSTRAINT posts_threads_id_fk FOREIGN KEY (thread) REFERENCES threads (id)
+);
+COMMENT ON COLUMN posts.parent IS ''Идентификатор родительского сообщения (0 - корневое сообщение обсуждения)'';
+COMMENT ON COLUMN posts.message IS ''сообщение форума'';
+COMMENT ON COLUMN posts.isedited IS ''Истина, если данное сообщение было изменено'';
+COMMENT ON COLUMN posts.forum IS ''Идентификатор форума (slug) данного сообещния'';
+COMMENT ON COLUMN posts.created IS ''Дата создания сообщения на форуме'';
+CREATE UNIQUE INDEX posts_id_uindex ON posts (id);
+CREATE TABLE threads
+(
+    id INTEGER DEFAULT nextval(''thread_id_seq''::regclass) PRIMARY KEY NOT NULL,
     title CITEXT NOT NULL,
     author CITEXT NOT NULL,
     forum CITEXT,
@@ -29,29 +47,28 @@ CREATE TABLE thread
     CONSTRAINT thread_users_nickname_fk FOREIGN KEY (author) REFERENCES users (nickname),
     CONSTRAINT thread_forums_slug_fk FOREIGN KEY (forum) REFERENCES forums (slug)
 );
-COMMENT ON COLUMN thread.title IS 'Заголовок ветки обсуждения.';
-COMMENT ON COLUMN thread.author IS 'nickname пользователя, создавшего данную тему.';
-COMMENT ON COLUMN thread.forum IS 'Форум, в котором расположена данная ветка обсуждения.';
-COMMENT ON COLUMN thread.message IS 'Описание ветки обсуждения.';
-COMMENT ON COLUMN thread.votes IS 'Кол-во голосов непосредственно за данное сообщение форума.';
-COMMENT ON COLUMN thread.slug IS 'Человекопонятный URL';
-COMMENT ON COLUMN thread.created IS 'Дата создания ветки на форуме.';
-CREATE UNIQUE INDEX "Thread_id_uindex" ON thread (id);
-
-
+COMMENT ON COLUMN threads.title IS ''Заголовок ветки обсуждения.'';
+COMMENT ON COLUMN threads.author IS ''nickname пользователя, создавшего данную тему.'';
+COMMENT ON COLUMN threads.forum IS ''Форум, в котором расположена данная ветка обсуждения.'';
+COMMENT ON COLUMN threads.message IS ''Описание ветки обсуждения.'';
+COMMENT ON COLUMN threads.votes IS ''Кол-во голосов непосредственно за данное сообщение форума.'';
+COMMENT ON COLUMN threads.slug IS ''Человекопонятный URL'';
+COMMENT ON COLUMN threads.created IS ''Дата создания ветки на форуме.'';
+CREATE UNIQUE INDEX "Thread_id_uindex" ON threads (id);
+CREATE UNIQUE INDEX thread_author_title_uindex ON threads (author, title);
 CREATE TABLE users
 (
     nickname CITEXT NOT NULL,
     fullname TEXT NOT NULL,
     about TEXT,
     email CITEXT NOT NULL,
-    id INTEGER DEFAULT nextval('users_id_seq'::regclass) PRIMARY KEY NOT NULL
+    id INTEGER DEFAULT nextval(''users_id_seq''::regclass) PRIMARY KEY NOT NULL
 );
-COMMENT ON COLUMN users.nickname IS 'Имя пользователя (уникальное поле). Данное поле допускает только латиницу, цифры и знак подчеркивания. Сравнение имени регистронезависимо.';
-COMMENT ON COLUMN users.fullname IS 'Полное имя пользователя.';
-COMMENT ON COLUMN users.about IS 'Описание пользователя.';
-COMMENT ON COLUMN users.email IS 'Почтовый адрес пользователя (уникальное поле).';
-COMMENT ON COLUMN users.id IS 'id юзера';
+COMMENT ON COLUMN users.nickname IS ''Имя пользователя (уникальное поле). Данное поле допускает только латиницу, цифры и знак подчеркивания. Сравнение имени регистронезависимо.'';
+COMMENT ON COLUMN users.fullname IS ''Полное имя пользователя.'';
+COMMENT ON COLUMN users.about IS ''Описание пользователя.'';
+COMMENT ON COLUMN users.email IS ''Почтовый адрес пользователя (уникальное поле).'';
+COMMENT ON COLUMN users.id IS ''id юзера'';
 CREATE UNIQUE INDEX "User_nickname_uindex" ON users (nickname);
 CREATE UNIQUE INDEX "User_email_uindex" ON users (email);
 CREATE UNIQUE INDEX users_id_uindex ON users (id);
