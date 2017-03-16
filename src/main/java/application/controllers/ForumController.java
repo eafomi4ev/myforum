@@ -2,15 +2,16 @@ package application.controllers;
 
 import application.models.ForumModel;
 import application.models.ThreadModel;
+import application.models.UserModel;
 import application.services.ForumDAO;
 import application.services.UserDAO;
 import application.support.ResponseMsg;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,10 +29,13 @@ import java.util.List;
 public final class ForumController {
 
     private ForumDAO forumServiceDAO;
+    private UserDAO userServiceDAO;
 
-    ForumController(JdbcTemplate jdbcTemplate, UserDAO userServiceDAO) {
-        this.forumServiceDAO = new ForumDAO(jdbcTemplate);
+    public ForumController(ForumDAO forumServiceDAO, UserDAO userServiceDAO) {
+        this.forumServiceDAO = forumServiceDAO;
+        this.userServiceDAO = userServiceDAO;
     }
+
 
     @RequestMapping(path = "/create", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity forumCreate(@RequestBody ForumModel forum) {
@@ -57,21 +61,33 @@ public final class ForumController {
         }
     }
 
-    //Получение информации о форуме по его идентификатору.
+    //Создание ветки в форуме
     @RequestMapping(path = "/{slug}/create", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity createThread(@PathVariable("slug") String forumSlug, @RequestBody ThreadModel thread) {
+        List<ThreadModel> threads;
+        UserModel user;
         try {
-            if (forumSlug != null && thread.getForum() == null) {
-                thread.setForum(forumSlug);
+//            if (thread.getForum() == null) {
+//                thread.setForum(forumSlug);
+//            }
+
+            threads = forumServiceDAO.getThreadBySlug(thread.getSlug());
+            if (threads != null && !threads.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(threads.get(0));
             }
 
+//            user = userServiceDAO.get(thread.getAuthor());
+
             forumServiceDAO.createThread(thread);
-            List<ThreadModel> threads = forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor());
+            threads = forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor());
             return ResponseEntity.status(HttpStatus.CREATED).body(threads.get(0));//201
         } catch (IndexOutOfBoundsException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Форум отсутствует в системе."));//404
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor()));//409
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Юзер отсутствует в системе."));//404
+
         }
     }
 

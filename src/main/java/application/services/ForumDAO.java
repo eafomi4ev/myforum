@@ -45,7 +45,7 @@ public final class ForumDAO {
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(users.nickname)=LOWER(?)), " +
                 "(SELECT slug FROM forums WHERE LOWER(forums.slug)=LOWER(?)), ?, ? , ? , ?)";
 
-        jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
+            jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
     }
 
     public List<ThreadModel> getThreads(String title, String nickname) {
@@ -56,6 +56,12 @@ public final class ForumDAO {
     public List<ThreadModel> getThreads(String forum) {
         String sql = "SELECT * FROM threads WHERE LOWER(forum) = LOWER(?) ";
         return jdbcTemplate.query(sql, new Object[]{forum}, new ThreadDAO.ThreadModelMapper());
+    }
+
+    //TODO: костыль, подумать над уникальностью поля slug. Надо узнать за один запрос, если такой slug есть, то вставлять нельзя.
+    public List<ThreadModel> getThreadBySlug(String slug) {
+        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?) ";
+        return jdbcTemplate.query(sql, new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
     }
 
     public List<ThreadModel> getThreads(String slug, String limit, Timestamp since, boolean desc) {

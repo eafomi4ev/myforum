@@ -22,9 +22,16 @@ public final class ThreadDAO {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+
     public List<PostModel> getPostsInThread(int threadId) {
         String sql = "SELECT * FROM posts WHERE thread = ?";
         List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadId}, new PostModelMapper());
+        return posts;
+    }
+
+    public List<PostModel> getPostsInThread(String threadSlug) {
+        String sql = "SELECT * FROM posts WHERE thread = ?";
+        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadSlug}, new PostModelMapper());
         return posts;
     }
 
@@ -40,6 +47,13 @@ public final class ThreadDAO {
         jdbcTemplate.update(sql.toString(), posts.get(0).getParent(), posts.get(0).getAuthor(), posts.get(0).getMessage(),
                 posts.get(0).getIsEdited(), posts.get(0).getThread(), posts.get(0).getThread());
 
+    }
+
+    //TODO: разобраться с получением веток тут и в ForumDAO
+    public List<ThreadModel> getThreadBySlug(String threadSlug) {
+        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?)";
+        List<ThreadModel> threads = jdbcTemplate.query(sql, new Object[]{threadSlug}, new ThreadModelMapper());
+        return threads;
     }
 
     protected static final class ThreadModelMapper implements RowMapper<ThreadModel> {
