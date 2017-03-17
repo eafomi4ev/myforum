@@ -31,10 +31,9 @@ public final class ForumDAO {
         jdbcTemplate.update(sql, forum.getTitle(), forum.getUser(), forum.getSlug(), forum.getPosts(), forum.getThreads());
     }
 
-    public ForumModel getbySlug(String slug) {
+    public ForumModel getForumbySlug(String slug) {
         final String sql = "SELECT * FROM forums WHERE LOWER(slug) = LOWER(?)";
         List<ForumModel> forums = jdbcTemplate.query(sql, new Object[]{slug}, new ForumDAO.ForumModelMapper());
-
 
         return forums.get(0);
     }
