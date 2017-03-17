@@ -52,16 +52,16 @@ public final class ForumDAO {
         return jdbcTemplate.query(sql, new Object[]{title, nickname}, new ThreadDAO.ThreadModelMapper());
     }
 
-    public List<ThreadModel> getThreads(String forum) {
+    public List<ThreadModel> getThreadsInForum(String forum) {
         String sql = "SELECT * FROM threads WHERE LOWER(forum) = LOWER(?) ";
         return jdbcTemplate.query(sql, new Object[]{forum}, new ThreadDAO.ThreadModelMapper());
     }
 
     //TODO: костыль, подумать над уникальностью поля slug. Надо узнать за один запрос, если такой slug есть, то вставлять нельзя.
-    public List<ThreadModel> getThreadBySlug(String slug) {
-        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?) ";
-        return jdbcTemplate.query(sql, new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
-    }
+//    public List<ThreadModel> getThreadBySlug(String slug) {
+//        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?) ";
+//        return jdbcTemplate.query(sql, new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
+//    }
 
     public List<ThreadModel> getThreads(String slug, String limit, Timestamp since, boolean desc) {
         StringBuffer sql = new StringBuffer("SELECT * FROM threads WHERE lower(forum) = lower(?)");

@@ -52,15 +52,14 @@ public final class ThreadDAO {
     //TODO: разобраться с получением веток тут и в ForumDAO
     public List<ThreadModel> getThreadBySlug(String threadSlug) {
         String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?)";
-        List<ThreadModel> threads = jdbcTemplate.query(sql, new Object[]{threadSlug}, new ThreadModelMapper());
-        return threads;
+        return jdbcTemplate.query(sql, new Object[]{threadSlug}, new ThreadModelMapper());
     }
 
     protected static final class ThreadModelMapper implements RowMapper<ThreadModel> {
         @Override
         public ThreadModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
 
-            ThreadModel thread = new ThreadModel(
+            return new ThreadModel(
                     resultSet.getInt("id"),
                     resultSet.getString("title"),
                     resultSet.getString("author"),
@@ -69,9 +68,6 @@ public final class ThreadDAO {
                     resultSet.getInt("votes"),
                     resultSet.getString("slug"),
                     resultSet.getTimestamp("created"));
-
-            return thread;
-
         }
     }
 
@@ -79,7 +75,7 @@ public final class ThreadDAO {
         @Override
         public PostModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
 
-            PostModel post = new PostModel(
+            return new PostModel(
                     resultSet.getInt("id"),
                     resultSet.getInt("parent"),
                     resultSet.getString("author"),
@@ -88,8 +84,6 @@ public final class ThreadDAO {
                     resultSet.getString("forum"),
                     resultSet.getInt("thread"),
                     resultSet.getTimestamp("created"));
-
-            return post;
 
         }
     }

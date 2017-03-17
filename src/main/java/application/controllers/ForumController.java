@@ -4,7 +4,7 @@ import application.models.ForumModel;
 import application.models.ThreadModel;
 import application.models.UserModel;
 import application.services.ForumDAO;
-import application.services.UserDAO;
+import application.services.ThreadDAO;
 import application.support.ResponseMsg;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,11 +29,11 @@ import java.util.List;
 public final class ForumController {
 
     private ForumDAO forumServiceDAO;
-    private UserDAO userServiceDAO;
+    private ThreadDAO threadServiceDAO;
 
-    public ForumController(ForumDAO forumServiceDAO, UserDAO userServiceDAO) {
+    public ForumController(ForumDAO forumServiceDAO, ThreadDAO threadServiceDAO) {
         this.forumServiceDAO = forumServiceDAO;
-        this.userServiceDAO = userServiceDAO;
+        this.threadServiceDAO = threadServiceDAO;
     }
 
 
@@ -71,7 +71,7 @@ public final class ForumController {
 //                thread.setForum(forumSlug);
 //            }
 
-            threads = forumServiceDAO.getThreadBySlug(thread.getSlug());
+            threads = threadServiceDAO.getThreadBySlug(thread.getSlug());
             if (threads != null && !threads.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(threads.get(0));
             }
@@ -105,7 +105,7 @@ public final class ForumController {
                                          @RequestParam(value = "since", required = false) String tmpSince,
                                          @RequestParam(value = "desc", required = false) boolean desc) {
 
-        List<ThreadModel> threadList = forumServiceDAO.getThreads(forumSlug);
+        List<ThreadModel> threadList = forumServiceDAO.getThreadsInForum(forumSlug);
         if (threadList.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
