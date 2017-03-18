@@ -2,7 +2,6 @@ package application.models;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.sql.Timestamp;
@@ -12,7 +11,7 @@ import java.sql.Timestamp;
  */
 
 //Аннотация исключает примитивы со значением 0 из сериализации. TODO: Проверить сериализацию, когда надо вернуть нулевое значение
-@JsonInclude(JsonInclude.Include.NON_DEFAULT)
+//@JsonInclude(JsonInclude.Include.NON_DEFAULT)
 public class ThreadModel {
     private int id;
     private String title;
@@ -104,5 +103,20 @@ public class ThreadModel {
 
     public void setCreated(Timestamp created) {
         this.created = created;
+    }
+
+    @Override
+    public String toString() {
+        StringBuffer str = new StringBuffer();
+        str.append("id: ").append(Integer.toString(id)).append('\n');
+        str.append("title: ").append(title).append('\n');
+        str.append("author: ").append(author).append('\n');
+        str.append("forum: ").append(forum).append('\n');
+        str.append("message: ").append(message).append('\n');
+        str.append("votes: ").append(Integer.toString(votes)).append('\n');
+        str.append("slug: ").append(slug).append('\n');
+        str.append("created: ").append(created.toString()).append('\n');
+
+        return str.toString();
     }
 }

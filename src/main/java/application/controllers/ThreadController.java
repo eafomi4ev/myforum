@@ -2,6 +2,7 @@ package application.controllers;
 
 import application.models.PostModel;
 import application.models.ThreadModel;
+import application.models.VoteModel;
 import application.services.ForumDAO;
 import application.services.ThreadDAO;
 import org.springframework.dao.DuplicateKeyException;
@@ -19,7 +20,7 @@ import java.util.List;
  */
 
 @RestController
-@RequestMapping(path = "/api/thread")
+@RequestMapping(path = "/api/thread/{threadId}")
 public class ThreadController {
 
     private ThreadDAO threadServiceDAO;
@@ -29,7 +30,7 @@ public class ThreadController {
         this.threadServiceDAO = threadServiceDAO;
     }
 
-    @RequestMapping(path = "/{threadId}/create")
+    @RequestMapping(path = "/create")
     public ResponseEntity create(@RequestBody List<PostModel> posts, @PathVariable("threadId") String threadId) {
         int id = -1;
         try {
@@ -39,8 +40,8 @@ public class ThreadController {
             }
 
         } catch (NumberFormatException e){
-            List<ThreadModel> tmpTread = threadServiceDAO.getThreadBySlug(threadId);
-            id = tmpTread.get(0).getId();
+            List<ThreadModel> tmpThread = threadServiceDAO.getThreadBySlug(threadId);
+            id = tmpThread.get(0).getId();
             for (PostModel post : posts) {
                 post.setThread(id);
             }
@@ -55,6 +56,31 @@ public class ThreadController {
 
         List<PostModel> list = threadServiceDAO.getPostsInThread(id);
         return ResponseEntity.status(HttpStatus.CREATED).body(threadServiceDAO.getPostsInThread(id));
+    }
+
+    @RequestMapping(path = "/vote")
+    public ResponseEntity createVote(@RequestBody VoteModel vote, @PathVariable("threadId") String threadId){
+
+        int id;
+        try {
+            id = Integer.parseInt(threadId);
+        } catch (NumberFormatException e){
+            List<ThreadModel> tmpThread = threadServiceDAO.getThreadBySlug(threadId);
+            id = tmpThread.get(0).getId();
+        }
+
+        List<ThreadModel> threads = threadServiceDAO.getThreadById(id);
+
+        if (threads.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        threadServiceDAO.createVote(vote, id);
+
+        threads = threadServiceDAO.getThreadById(id);// todo: Возможно как-то пересчитывать значение голосов непосредственно здесь и не ходить второй в БД
+
+
+        return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
     }
 
 }

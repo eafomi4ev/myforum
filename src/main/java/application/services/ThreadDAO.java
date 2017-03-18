@@ -2,6 +2,7 @@ package application.services;
 
 import application.models.PostModel;
 import application.models.ThreadModel;
+import application.models.VoteModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,7 @@ public final class ThreadDAO {
         StringBuffer sql = new StringBuffer("INSERT INTO posts (parent, author, message, isedited, forum, thread, created) " +
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, " +
                 "(SELECT forum FROM threads WHERE id = ?), ?, ").append(
-                        posts.get(0).getCreated() == null ? "DEFAULT" : posts.get(0).getCreated().toString()).append(")");
+                posts.get(0).getCreated() == null ? "DEFAULT" : posts.get(0).getCreated().toString()).append(")");
 
 
         System.out.println(sql.toString());
@@ -53,6 +54,23 @@ public final class ThreadDAO {
     public List<ThreadModel> getThreadBySlug(String threadSlug) {
         String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?)";
         return jdbcTemplate.query(sql, new Object[]{threadSlug}, new ThreadModelMapper());
+    }
+
+    public List<ThreadModel> getThreadById(int id) {
+        String sql = "SELECT * FROM threads WHERE id = ?";
+        return jdbcTemplate.query(sql, new Object[]{id}, new ThreadModelMapper());
+    }
+
+    public void createVote(VoteModel vote, int threadId) {
+        String sql = "INSERT INTO votes (nickname, voice, thread_id) VALUES ((SELECT nickname FROM users WHERE" +
+                "  LOWER(users.nickname)=LOWER(?)), ?, ?) ON CONFLICT (nickname) DO UPDATE SET voice = ?;";
+
+        jdbcTemplate.update(sql.toString(), vote.getNickname(), vote.getVoice(), threadId, vote.getVoice());
+
+        sql = "UPDATE threads SET votes = (SELECT SUM(voice) FROM votes WHERE thread_id = ?) WHERE  id = ?";
+
+        jdbcTemplate.update(sql, threadId, threadId);
+
     }
 
     protected static final class ThreadModelMapper implements RowMapper<ThreadModel> {
@@ -69,6 +87,7 @@ public final class ThreadDAO {
                     resultSet.getString("slug"),
                     resultSet.getTimestamp("created"));
         }
+
     }
 
     protected static final class PostModelMapper implements RowMapper<PostModel> {
@@ -85,6 +104,18 @@ public final class ThreadDAO {
                     resultSet.getInt("thread"),
                     resultSet.getTimestamp("created"));
 
+        }
+    }
+
+    protected static final class VoteModelMapper implements RowMapper<VoteModel> {
+
+        @Override
+        public VoteModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
+
+            return new VoteModel(
+                    resultSet.getString("nickname"),
+                    resultSet.getInt("voice"),
+                    resultSet.getInt("thread_id"));
         }
     }
 
