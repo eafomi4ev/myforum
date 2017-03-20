@@ -1,6 +1,7 @@
 package application.models;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.sql.Timestamp;
@@ -9,6 +10,7 @@ import java.sql.Timestamp;
  * Created by egor on 15.03.17.
  */
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class PostModel {
 
     private int id;
