@@ -4,16 +4,12 @@ import application.models.PostModel;
 import application.models.ThreadModel;
 import application.models.VoteModel;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,7 +28,7 @@ public final class ThreadDAO {
     public List<PostModel> getPostsInThread(int threadId) {
 
         String sql = "SELECT * FROM posts WHERE thread = ?";
-        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadId}, new PostModelMapper());
+        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadId}, new PostDAO.PostModelMapper());
         return posts;
     }
 
@@ -46,13 +42,13 @@ public final class ThreadDAO {
 //        parentsIDString.deleteCharAt(parentsIDString.length() - 1);
         System.out.println(parentsIDString.toString());
         StringBuffer sql = new StringBuffer("SELECT * FROM posts WHERE thread = ? AND parent IN ").append(parentsIDString.toString());
-        List<PostModel> posts = jdbcTemplate.query(sql.toString(), new Object[]{threadId}, new PostModelMapper());
+        List<PostModel> posts = jdbcTemplate.query(sql.toString(), new Object[]{threadId}, new PostDAO.PostModelMapper());
         return posts;
     }
 
     public List<PostModel> getPostsInThread(String threadSlug) {
         String sql = "SELECT * FROM posts WHERE thread = ?";
-        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadSlug}, new PostModelMapper());
+        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadSlug}, new PostDAO.PostModelMapper());
         return posts;
     }
 
@@ -94,6 +90,14 @@ public final class ThreadDAO {
 //
 //        return keyHolder.getKey().intValue();
 //
+        if (post.getParent() != 0) {
+            PostDAO postDAO = new PostDAO(jdbcTemplate);
+            PostModel parentPost = postDAO.getPostByID(post.getParent());
+            if (post.getThread() != parentPost.getThread()) {
+                throw new IllegalArgumentException("Родительский пост отсутствует в ветке");
+            }
+        }
+
         StringBuffer sql = new StringBuffer("INSERT INTO posts (parent, author, message, isedited, forum, thread, created) " +
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, " +
                 "(SELECT forum FROM threads WHERE id = ?), ?, ").append(
@@ -101,11 +105,15 @@ public final class ThreadDAO {
 
         jdbcTemplate.update(sql.toString(), post.getParent(), post.getAuthor(), post.getMessage(),
                 post.getIsEdited(), post.getThread(), post.getThread());
+        sql.setLength(0);
+
+        sql.append("UPDATE forums SET posts = posts + 1 WHERE slug = (SELECT forum FROM threads WHERE id = ?)"); //todo: сделать keyHolder, обновлять запись в forums по id
+        jdbcTemplate.update(sql.toString(), post.getThread());
     }
 
     public PostModel getLastAddedPost() {
         String sql = "SELECT * FROM posts WHERE id = (SELECT max(id) FROM posts)";
-        return jdbcTemplate.query(sql, new PostModelMapper()).get(0);
+        return jdbcTemplate.query(sql, new PostDAO.PostModelMapper()).get(0);
     }
 
     //TODO: разобраться с получением веток тут и в ForumDAO
@@ -114,7 +122,7 @@ public final class ThreadDAO {
         return jdbcTemplate.query(sql, new Object[]{threadSlug}, new ThreadModelMapper());
     }
 
-    public List<ThreadModel> getThreadById(int id) {
+    public List<ThreadModel> getThreadById(int id) { //todo: Должен возвращать 1 thread, а не List
         String sql = "SELECT * FROM threads WHERE id = ?";
         return jdbcTemplate.query(sql, new Object[]{id}, new ThreadModelMapper());
     }
@@ -132,10 +140,20 @@ public final class ThreadDAO {
     }
 
     public List<PostModel> getPostsInThread(int threadId, Integer limit, int marker, String sort, boolean desc) {
-        if (sort.equals("flat")) {
-            return getPostsInFlatSort(threadId, limit, marker, desc);
+        try {
+            if (sort.equals("flat")) {
+                return getPostsInFlatSort(threadId, limit, marker, desc);
+            }
+            if (sort.equals("tree")) {
+                return getPostsInTreeSort(threadId, limit, marker, desc);
+            }
+            if (sort.equals("parent_tree")) {
+                return getPostsInParentTreeSort(threadId, limit, marker, desc);
+            }
+            return null;
+        } catch (IndexOutOfBoundsException e) {
+            throw e;
         }
-        return null;
     }
 
 
@@ -150,12 +168,99 @@ public final class ThreadDAO {
 
         sql.append(" LIMIT ? OFFSET ?");
 
-        return jdbcTemplate.query(sql.toString(), new Object[]{threadId, limit, marker}, new PostModelMapper());
+        try {
+            ThreadModel thread = getThreadById(threadId).get(0);
+        } catch (IndexOutOfBoundsException e) {
+            throw e;
+        }
+
+        return jdbcTemplate.query(sql.toString(), new Object[]{threadId, limit, marker}, new PostDAO.PostModelMapper());
 
     }
 
+    private List<PostModel> getPostsInTreeSort(int threadId, Integer limit, int marker, boolean desc) {
+        final List<Object> arguments = new ArrayList<>();
+        StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM posts " +
+                "WHERE parent = 0 AND thread = ? UNION ALL SELECT p.id, array_append(path, p.id) FROM posts p JOIN " +
+                "rec ON rec.id = p.parent AND p.thread = ?) SELECT p.* FROM rec JOIN " +
+                "posts p ON rec.id = p.id ORDER BY array_to_string(rec.path, '.')");
+        arguments.add(threadId);
+        arguments.add(threadId);
 
-    protected static final class ThreadModelMapper implements RowMapper<ThreadModel> {
+        if (desc) {
+            sql.append(" DESC");
+        }
+
+        if (limit > 0) {
+            sql.append(" LIMIT ?");
+            arguments.add(limit);
+        }
+
+        if (marker > 0) {
+            sql.append(" OFFSET ?");
+            arguments.add(marker);
+        }
+
+        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new PostDAO.PostModelMapper());
+    }
+
+    private List<PostModel> getPostsInParentTreeSort(int threadId, Integer limit, int marker, boolean desc) {
+
+        final List<Object> arguments = new ArrayList<>();
+        StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM " +
+                "(SELECT DISTINCT id FROM posts WHERE thread = ? AND parent = 0 ORDER BY id");
+        arguments.add(threadId);
+
+        if (desc) {
+            sql.append(" DESC");
+        }
+
+        if (limit > 0) {
+            sql.append(" LIMIT ?");
+            arguments.add(limit);
+        }
+
+        if (marker > 0) {
+            sql.append(" OFFSET ?");
+            arguments.add(marker);
+        }
+
+        sql.append(") a UNION ALL SELECT p.id, array_append(path, p.id) FROM posts p JOIN rec ON rec.id = p.parent) " +
+                "SELECT p.* FROM rec JOIN posts p ON rec.id = p.id ORDER BY array_to_string(rec.path, '.')");
+
+        if (desc) {
+            sql.append(" DESC");
+        }
+
+        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new PostDAO.PostModelMapper());
+    }
+
+
+    public ThreadModel detailsUpdate(int threadID, ThreadModel thread) {
+
+        StringBuffer sql = new StringBuffer("UPDATE threads SET");
+        final List<Object> arguments = new ArrayList<>();
+        if (thread.getTitle() != null && !thread.getTitle().isEmpty()) {
+            sql.append(" title = ?,");
+            arguments.add(thread.getTitle());
+        }
+
+        if (thread.getMessage() != null && !thread.getMessage().isEmpty()) {
+            sql.append(" message = ?,");
+            arguments.add(thread.getMessage());
+        }
+
+        if (arguments.size() != 0) {
+            sql.deleteCharAt(sql.length() - 1);
+            sql.append(" WHERE id = ?");
+            arguments.add(threadID);
+            jdbcTemplate.update(sql.toString(), arguments.toArray());
+        }
+        return getThreadById(threadID).get(0);
+    }
+
+
+        protected static final class ThreadModelMapper implements RowMapper<ThreadModel> {
         @Override
         public ThreadModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
 
@@ -170,23 +275,6 @@ public final class ThreadDAO {
                     resultSet.getTimestamp("created"));
         }
 
-    }
-
-    protected static final class PostModelMapper implements RowMapper<PostModel> {
-        @Override
-        public PostModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
-
-            return new PostModel(
-                    resultSet.getInt("id"),
-                    resultSet.getInt("parent"),
-                    resultSet.getString("author"),
-                    resultSet.getString("message"),
-                    resultSet.getBoolean("isedited"),
-                    resultSet.getString("forum"),
-                    resultSet.getInt("thread"),
-                    resultSet.getTimestamp("created"));
-
-        }
     }
 
     protected static final class VoteModelMapper implements RowMapper<VoteModel> {

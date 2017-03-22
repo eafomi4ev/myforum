@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -127,7 +128,22 @@ public final class ForumController {
         } else {
             return ResponseEntity.status(HttpStatus.OK).body("[]");//404
         }
+    }
 
+    @RequestMapping(path = "/{slug}/users", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity getUsersList(@PathVariable("slug") String forumSlug,
+                                       @RequestParam(value = "limit", required = false) Integer limit,
+                                       @RequestParam(value = "since", required = false) String since,
+                                       @RequestParam(value = "desc", required = false) boolean desc, HttpServletResponse httpServletResponse) {
+
+        ForumModel forum = null;
+        try {
+            forum = forumServiceDAO.getForumbySlug(forumSlug);
+        } catch (IndexOutOfBoundsException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        List<UserModel> userList = forumServiceDAO.getUsersInForum(forumSlug, limit, since, desc);
+        return ResponseEntity.ok(userList);
 
     }
 }

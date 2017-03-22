@@ -2,6 +2,7 @@ package application.services;
 
 import application.models.ForumModel;
 import application.models.ThreadModel;
+import application.models.UserModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.util.StringUtils;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -44,7 +46,11 @@ public final class ForumDAO {
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(users.nickname)=LOWER(?)), " +
                 "(SELECT slug FROM forums WHERE LOWER(forums.slug)=LOWER(?)), ?, ? , ? , ?)";
 
-            jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
+        jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
+
+        sql = "UPDATE forums SET threads = threads + 1 WHERE slug = ?"; //todo: сделать keyHolder, обновлять запись в forums по id
+        jdbcTemplate.update(sql, thread.getForum());
+
     }
 
     public List<ThreadModel> getThreads(String title, String nickname) {
@@ -89,6 +95,39 @@ public final class ForumDAO {
 
         List<ThreadModel> list = jdbcTemplate.query(sql.toString(), new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
         return list;
+    }
+
+    public List<UserModel> getUsersInForum(String forumSlug, Integer limit, String since, boolean desc) {
+        final List<Object> arguments = new ArrayList<>();
+        StringBuffer sql = new StringBuffer("SELECT * from users u WHERE nickname IN (" +
+                "SELECT DISTINCT u.nickname FROM users u JOIN posts p on p.author = u.nickname WHERE lower(p.forum) = lower(?)" +
+                " UNION" +
+                "  SELECT DISTINCT u.nickname FROM users u JOIN threads t on t.author = u.nickname WHERE lower(t.forum) = lower(?))");
+        arguments.add(forumSlug);
+        arguments.add(forumSlug);
+
+        if (since != null) {
+            sql.append(" AND lower(u.nickname)");
+            if (desc)
+                sql.append(" <");
+            else
+                sql.append(" >");
+            sql.append(" lower(?)");
+            arguments.add(since);
+        }
+
+        sql.append(" ORDER BY nickname");
+
+        if (desc) {
+            sql.append(" DESC");
+        }
+
+        if (limit != null) {
+            sql.append(" LIMIT ?");
+            arguments.add(limit);
+        }
+
+        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new UserDAO.UserModelMapper());
     }
 
 

@@ -20,6 +20,9 @@ public class ForumModel {
     @JsonProperty
     private int posts;
 
+    @JsonProperty
+    private int threads;
+
     @JsonCreator
     public ForumModel(@JsonProperty("title") String title, @JsonProperty("user") String user, @JsonProperty("slug") String slug,
                       @JsonProperty("post") int posts, @JsonProperty("threads") int threads) {
@@ -72,6 +75,6 @@ public class ForumModel {
         this.threads = threads;
     }
 
-    private int threads;
+
 
 }

@@ -1,10 +1,7 @@
 package application.models;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 
@@ -15,21 +12,21 @@ import java.util.List;
 
 public class PostPageModel {
 
-    private Integer marker;
+    private String marker;
     private List<PostModel> posts;
 
     private static final ObjectMapper mapper = new ObjectMapper().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
 
-    public PostPageModel(Integer marker, List<PostModel> posts) {
+    public PostPageModel(String marker, List<PostModel> posts) {
         this.marker = marker;
         this.posts = posts;
     }
 
-    public Integer getMarker() {
+    public String getMarker() {
         return marker;
     }
 
-    public void setMarker(Integer marker) {
+    public void setMarker(String marker) {
         this.marker = marker;
     }
 
@@ -41,16 +38,16 @@ public class PostPageModel {
         this.posts = posts;
     }
 
-    public ObjectNode toJson() {
-        final ArrayNode arrayNode = mapper.createArrayNode();
-        for (PostModel post : posts) {
-            arrayNode.add(mapper.convertValue(post, JsonNode.class));
-        }
-
-        final ObjectNode node = mapper.createObjectNode();
-        node.put("marker", marker.toString());
-        node.set("posts", arrayNode);
-
-        return node;
-    }
+//    public ObjectNode toJson() {
+//        final ArrayNode arrayNode = mapper.createArrayNode();
+//        for (PostModel post : posts) {
+//            arrayNode.add(mapper.convertValue(post, JsonNode.class));
+//        }
+//
+//        final ObjectNode node = mapper.createObjectNode();
+//        node.put("marker", marker.toString());
+//        node.set("posts", arrayNode);
+//
+//        return node;
+//    }
 }
