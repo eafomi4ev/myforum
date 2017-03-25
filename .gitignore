@@ -1,7 +1,7 @@
 /.idea/
 myforum.iml
 /target/*
-!/target/myforum-1.0-SNAPSHOT.jar
+!/target/myforugitm-1.0-SNAPSHOT.jar
 src/test/
 target/generated-sources/
 hotkey
