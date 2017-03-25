@@ -1,3 +1,9 @@
 /.idea/
 myforum.iml
-
+/target/*
+!/target/myforum-1.0-SNAPSHOT.jar
+src/test/
+target/generated-sources/
+hotkey
+sql_db_creator.sql
+.DS_Store
