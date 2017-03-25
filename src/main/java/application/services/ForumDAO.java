@@ -2,18 +2,22 @@ package application.services;
 
 import application.models.ForumModel;
 import application.models.ThreadModel;
+import application.models.UserModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Created by egor on 06.03.17.
  */
+@Service
 public final class ForumDAO {
 
     private JdbcTemplate jdbcTemplate;
@@ -29,35 +33,44 @@ public final class ForumDAO {
         jdbcTemplate.update(sql, forum.getTitle(), forum.getUser(), forum.getSlug(), forum.getPosts(), forum.getThreads());
     }
 
-    public ForumModel getbySlug(String slug) {
+    public ForumModel getForumbySlug(String slug) {
         final String sql = "SELECT * FROM forums WHERE LOWER(slug) = LOWER(?)";
         List<ForumModel> forums = jdbcTemplate.query(sql, new Object[]{slug}, new ForumDAO.ForumModelMapper());
-
 
         return forums.get(0);
     }
 
 
     public void createThread(ThreadModel thread) {
-        String sql = "INSERT INTO thread (title, author, forum, message, votes, slug, created) " +
+        String sql = "INSERT INTO threads (title, author, forum, message, votes, slug, created) " +
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(users.nickname)=LOWER(?)), " +
                 "(SELECT slug FROM forums WHERE LOWER(forums.slug)=LOWER(?)), ?, ? , ? , ?)";
 
         jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
+
+        sql = "UPDATE forums SET threads = threads + 1 WHERE slug = ?"; //todo: сделать keyHolder, обновлять запись в forums по id
+        jdbcTemplate.update(sql, thread.getForum());
+
     }
 
     public List<ThreadModel> getThreads(String title, String nickname) {
-        String sql = "SELECT * FROM thread WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?)";
-        return jdbcTemplate.query(sql, new Object[]{title, nickname}, new ForumDAO.ThreadModelMapper());
+        String sql = "SELECT * FROM threads WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?)";
+        return jdbcTemplate.query(sql, new Object[]{title, nickname}, new ThreadDAO.ThreadModelMapper());
     }
 
-    public List<ThreadModel> getThreads(String forum) {
-        String sql = "SELECT * FROM thread WHERE LOWER(forum) = LOWER(?) ";
-        return jdbcTemplate.query(sql, new Object[]{forum}, new ForumDAO.ThreadModelMapper());
+    public List<ThreadModel> getThreadsInForum(String forum) {
+        String sql = "SELECT * FROM threads WHERE LOWER(forum) = LOWER(?) ";
+        return jdbcTemplate.query(sql, new Object[]{forum}, new ThreadDAO.ThreadModelMapper());
     }
+
+    //TODO: костыль, подумать над уникальностью поля slug. Надо узнать за один запрос, если такой slug есть, то вставлять нельзя.
+//    public List<ThreadModel> getThreadBySlug(String slug) {
+//        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?) ";
+//        return jdbcTemplate.query(sql, new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
+//    }
 
     public List<ThreadModel> getThreads(String slug, String limit, Timestamp since, boolean desc) {
-        StringBuffer sql = new StringBuffer("SELECT * FROM thread WHERE lower(forum) = lower(?)");
+        StringBuffer sql = new StringBuffer("SELECT * FROM threads WHERE lower(forum) = lower(?)");
         if (!StringUtils.isEmpty(since)) {
             if (desc) {
                 sql.append(" AND created <= '").append(since).append("'::TIMESTAMP").append(" ORDER BY created").append(" DESC");
@@ -80,9 +93,41 @@ public final class ForumDAO {
             sql.deleteCharAt(sql.length() - 1);
         }
 
-        System.out.println(sql);
-        List<ThreadModel> list = jdbcTemplate.query(sql.toString(), new Object[]{slug}, new ForumDAO.ThreadModelMapper());
+        List<ThreadModel> list = jdbcTemplate.query(sql.toString(), new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
         return list;
+    }
+
+    public List<UserModel> getUsersInForum(String forumSlug, Integer limit, String since, boolean desc) {
+        final List<Object> arguments = new ArrayList<>();
+        StringBuffer sql = new StringBuffer("SELECT * from users u WHERE nickname IN (" +
+                "SELECT DISTINCT u.nickname FROM users u JOIN posts p on p.author = u.nickname WHERE lower(p.forum) = lower(?)" +
+                " UNION" +
+                "  SELECT DISTINCT u.nickname FROM users u JOIN threads t on t.author = u.nickname WHERE lower(t.forum) = lower(?))");
+        arguments.add(forumSlug);
+        arguments.add(forumSlug);
+
+        if (since != null) {
+            sql.append(" AND lower(u.nickname)");
+            if (desc)
+                sql.append(" <");
+            else
+                sql.append(" >");
+            sql.append(" lower(?)");
+            arguments.add(since);
+        }
+
+        sql.append(" ORDER BY nickname");
+
+        if (desc) {
+            sql.append(" DESC");
+        }
+
+        if (limit != null) {
+            sql.append(" LIMIT ?");
+            arguments.add(limit);
+        }
+
+        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new UserDAO.UserModelMapper());
     }
 
 
@@ -99,24 +144,5 @@ public final class ForumDAO {
 
         }
     }
-
-    private static final class ThreadModelMapper implements RowMapper<ThreadModel> {
-        @Override
-        public ThreadModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
-
-            ThreadModel thread = new ThreadModel(resultSet.getInt("id"),
-                    resultSet.getString("title"),
-                    resultSet.getString("author"),
-                    resultSet.getString("forum"),
-                    resultSet.getString("message"),
-                    resultSet.getInt("votes"),
-                    resultSet.getString("slug"),
-                    resultSet.getTimestamp("created"));
-
-            return thread;
-
-        }
-    }
-
 
 }

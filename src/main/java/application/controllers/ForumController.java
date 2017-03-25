@@ -2,18 +2,20 @@ package application.controllers;
 
 import application.models.ForumModel;
 import application.models.ThreadModel;
+import application.models.UserModel;
 import application.services.ForumDAO;
-import application.services.UserDAO;
+import application.services.ThreadDAO;
 import application.support.ResponseMsg;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -28,19 +30,22 @@ import java.util.List;
 public final class ForumController {
 
     private ForumDAO forumServiceDAO;
+    private ThreadDAO threadServiceDAO;
 
-    ForumController(JdbcTemplate jdbcTemplate, UserDAO userServiceDAO) {
-        this.forumServiceDAO = new ForumDAO(jdbcTemplate);
+    public ForumController(ForumDAO forumServiceDAO, ThreadDAO threadServiceDAO) {
+        this.forumServiceDAO = forumServiceDAO;
+        this.threadServiceDAO = threadServiceDAO;
     }
+
 
     @RequestMapping(path = "/create", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity forumCreate(@RequestBody ForumModel forum) {
 
         try {
             forumServiceDAO.create(forum);
-            return ResponseEntity.status(HttpStatus.CREATED).body(forumServiceDAO.getbySlug(forum.getSlug()));//201
+            return ResponseEntity.status(HttpStatus.CREATED).body(forumServiceDAO.getForumbySlug(forum.getSlug()));//201
         } catch (DuplicateKeyException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getbySlug(forum.getSlug()));//409
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getForumbySlug(forum.getSlug()));//409
         } catch (DataIntegrityViolationException exception) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Пользователь отсутствует в системе."));//404
 
@@ -51,27 +56,46 @@ public final class ForumController {
     @RequestMapping(path = "/{slug}/details", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity forumDetails(@PathVariable("slug") String slug) {
         try {
-            return ResponseEntity.ok(forumServiceDAO.getbySlug(slug));//200
+            return ResponseEntity.ok(forumServiceDAO.getForumbySlug(slug));//200
         } catch (IndexOutOfBoundsException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Форум отсутствует в системе."));//404
         }
     }
 
-    //Получение информации о форуме по его идентификатору.
+    //Создание ветки в форуме
     @RequestMapping(path = "/{slug}/create", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity createThread(@PathVariable("slug") String forumSlug, @RequestBody ThreadModel thread) {
+        List<ThreadModel> threads;
+        UserModel user;
         try {
-            if (forumSlug != null && thread.getForum() == null) {
-                thread.setForum(forumSlug);
+//            if (thread.getForum() == null) {
+//                thread.setForum(forumSlug);
+//            }
+
+            threads = threadServiceDAO.getThreadBySlug(thread.getSlug());
+            if (threads != null && !threads.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(threads.get(0));
+            }
+
+            ForumModel forum = forumServiceDAO.getForumbySlug(forumSlug);
+            if (forum == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();//404
+
             }
 
             forumServiceDAO.createThread(thread);
-            List<ThreadModel> threads = forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor());
+            threads = forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor());
+            if (threads.isEmpty()) {
+                ResponseEntity.status(HttpStatus.CONFLICT).build();
+            }
             return ResponseEntity.status(HttpStatus.CREATED).body(threads.get(0));//201
         } catch (IndexOutOfBoundsException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Форум отсутствует в системе."));//404
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(forumServiceDAO.getThreads(thread.getTitle(), thread.getAuthor()));//409
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseMsg("Юзер отсутствует в системе."));//404
+
         }
     }
 
@@ -82,7 +106,7 @@ public final class ForumController {
                                          @RequestParam(value = "since", required = false) String tmpSince,
                                          @RequestParam(value = "desc", required = false) boolean desc) {
 
-        List<ThreadModel> threadList = forumServiceDAO.getThreads(forumSlug);
+        List<ThreadModel> threadList = forumServiceDAO.getThreadsInForum(forumSlug);
         if (threadList.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -104,7 +128,22 @@ public final class ForumController {
         } else {
             return ResponseEntity.status(HttpStatus.OK).body("[]");//404
         }
+    }
 
+    @RequestMapping(path = "/{slug}/users", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity getUsersList(@PathVariable("slug") String forumSlug,
+                                       @RequestParam(value = "limit", required = false) Integer limit,
+                                       @RequestParam(value = "since", required = false) String since,
+                                       @RequestParam(value = "desc", required = false) boolean desc, HttpServletResponse httpServletResponse) {
+
+        ForumModel forum = null;
+        try {
+            forum = forumServiceDAO.getForumbySlug(forumSlug);
+        } catch (IndexOutOfBoundsException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        List<UserModel> userList = forumServiceDAO.getUsersInForum(forumSlug, limit, since, desc);
+        return ResponseEntity.ok(userList);
 
     }
 }

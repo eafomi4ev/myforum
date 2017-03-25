@@ -109,7 +109,7 @@ public final class UserDAO {
 
 
     //Преобразование
-    private static final class UserModelMapper implements RowMapper<UserModel> {
+    public static final class UserModelMapper implements RowMapper<UserModel> {
 
         @Override
         public UserModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
