@@ -5,6 +5,7 @@ import application.models.PostPageModel;
 import application.models.ThreadModel;
 import application.models.VoteModel;
 import application.services.ForumDAO;
+import application.services.PostDAO;
 import application.services.ThreadDAO;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -26,9 +27,11 @@ public final class ThreadController {
 
     private ThreadDAO threadServiceDAO;
     private ForumDAO forumServiceDAO;
+    private PostDAO postServiceDAO;
 
-    public ThreadController(ThreadDAO threadServiceDAO) {
+    public ThreadController(ThreadDAO threadServiceDAO, PostDAO postServiceDAO) {
         this.threadServiceDAO = threadServiceDAO;
+        this.postServiceDAO = postServiceDAO;
     }
 
     @RequestMapping(path = "/create")
@@ -46,11 +49,22 @@ public final class ThreadController {
 
         List<Integer> parentsID = new ArrayList<>();
         List<PostModel> list = new ArrayList<>();
-        for (PostModel post : posts) {
-            post.setThread(id);
+//        Timestamp timestamp = new Timestamp(new Date().);
+//        final String created = LocalDateTime.now().toString();
+//        final Timestamp timestamp = Timestamp.valueOf(LocalDateTime.parse(created));
 
+
+        PostModel tmpPost = null;
+        for (int i = 0; i < posts.size(); i++) {
+            posts.get(i).setThread(id);
+            if (i != 0) {
+                posts.get(i).setCreated(tmpPost.getCreated());
+            }
             try {
-                threadServiceDAO.createPost(post);
+                threadServiceDAO.createPost(posts.get(i));
+                if (i == 0) {
+                    tmpPost = threadServiceDAO.getLastAddedPost();
+                }
                 list.add(threadServiceDAO.getLastAddedPost());//TODO: Как-то запоминать id добавленных постов и потом вытаскивать их
             } catch (DuplicateKeyException e) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(threadServiceDAO.getPostsInThread(id));//409

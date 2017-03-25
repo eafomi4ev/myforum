@@ -100,8 +100,13 @@ public final class ThreadDAO {
 
         StringBuffer sql = new StringBuffer("INSERT INTO posts (parent, author, message, isedited, forum, thread, created) " +
                 "VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, " +
-                "(SELECT forum FROM threads WHERE id = ?), ?, ").append(
-                post.getCreated() == null ? "DEFAULT" : post.getCreated().toString()).append(")");
+                "(SELECT forum FROM threads WHERE id = ?), ?, ");
+
+        if (post.getCreated() == null) {
+            sql.append("DEFAULT )");
+        } else {
+            sql.append("'").append(post.getCreated().toString()).append("')");
+        }
 
         jdbcTemplate.update(sql.toString(), post.getParent(), post.getAuthor(), post.getMessage(),
                 post.getIsEdited(), post.getThread(), post.getThread());
@@ -166,7 +171,15 @@ public final class ThreadDAO {
             sql.append(" DESC");
         }
 
+        sql.append(", id");
+
+        if (desc) {
+            sql.append(" DESC");
+        }
+
         sql.append(" LIMIT ? OFFSET ?");
+
+
 
         try {
             ThreadModel thread = getThreadById(threadId).get(0);
