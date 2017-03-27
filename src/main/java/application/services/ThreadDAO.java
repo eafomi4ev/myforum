@@ -196,9 +196,15 @@ public final class ThreadDAO {
         StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM posts " +
                 "WHERE parent = 0 AND thread = ? UNION ALL SELECT p.id, array_append(path, p.id) FROM posts p JOIN " +
                 "rec ON rec.id = p.parent AND p.thread = ?) SELECT p.* FROM rec JOIN " +
-                "posts p ON rec.id = p.id ORDER BY array_to_string(rec.path, '.')");
+                "posts p ON rec.id = p.id ORDER BY rec.path");
         arguments.add(threadId);
         arguments.add(threadId);
+
+        if (desc) {
+            sql.append(" DESC");
+        }
+
+        sql.append(", id");
 
         if (desc) {
             sql.append(" DESC");
@@ -219,33 +225,36 @@ public final class ThreadDAO {
 
     private List<PostModel> getPostsInParentTreeSort(int threadId, Integer limit, int marker, boolean desc) {
 
-        final List<Object> arguments = new ArrayList<>();
+        final ArrayList<Object> parameters = new ArrayList<>();
         StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM " +
-                "(SELECT DISTINCT id FROM posts WHERE thread = ? AND parent = 0 ORDER BY id");
-        arguments.add(threadId);
+                "(SELECT DISTINCT id FROM posts WHERE thread = ? AND parent = 0 ORDER BY id ");
+        parameters.add(threadId);
 
         if (desc) {
-            sql.append(" DESC");
+            sql.append(" DESC ");
         }
 
         if (limit > 0) {
-            sql.append(" LIMIT ?");
-            arguments.add(limit);
+            sql.append(" LIMIT ? ");
+            parameters.add(limit);
         }
 
         if (marker > 0) {
-            sql.append(" OFFSET ?");
-            arguments.add(marker);
+            sql.append(" OFFSET ? ");
+            parameters.add(marker);
         }
 
-        sql.append(") a UNION ALL SELECT p.id, array_append(path, p.id) FROM posts p JOIN rec ON rec.id = p.parent) " +
-                "SELECT p.* FROM rec JOIN posts p ON rec.id = p.id ORDER BY array_to_string(rec.path, '.')");
+        sql.append(") roots " +
+                "UNION ALL " +
+                "SELECT p.id, array_append(path, p.id) FROM posts p " +
+                "JOIN rec rp ON rp.id = p.parent) " +
+                "SELECT p.* FROM rec JOIN posts p ON rec.id = p.id ORDER BY rec.path ");
 
         if (desc) {
-            sql.append(" DESC");
+            sql.append(" DESC ");
         }
 
-        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new PostDAO.PostModelMapper());
+        return jdbcTemplate.query(sql.toString(), parameters.toArray(), new PostDAO.PostModelMapper());
     }
 
 
