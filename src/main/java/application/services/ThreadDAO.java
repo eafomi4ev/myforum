@@ -247,7 +247,7 @@ public final class ThreadDAO {
         sql.append(") roots " +
                 "UNION ALL " +
                 "SELECT p.id, array_append(path, p.id) FROM posts p " +
-                "JOIN rec rp ON rp.id = p.parent) " +
+                "JOIN rec ON rec.id = p.parent) " +
                 "SELECT p.* FROM rec JOIN posts p ON rec.id = p.id ORDER BY rec.path ");
 
         if (desc) {
