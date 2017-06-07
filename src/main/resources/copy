@@ -7,38 +7,38 @@ DROP TABLE IF EXISTS users;
 CREATE EXTENSION IF NOT EXISTS citext;
 
 CREATE SEQUENCE IF NOT EXISTS public."Forum_id_seq"
-INCREMENT 1
-START 1
-MINVALUE 1
-MAXVALUE 9223372036854775807
-CACHE 1;
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
 
 CREATE SEQUENCE IF NOT EXISTS public.posts_id_seq
-INCREMENT 1
-START 1
-MINVALUE 1
-MAXVALUE 9223372036854775807
-CACHE 1;
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
 
 CREATE SEQUENCE IF NOT EXISTS public.thread_id_seq
-INCREMENT 1
-START 1
-MINVALUE 1
-MAXVALUE 9223372036854775807
-CACHE 1;
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
 
 CREATE SEQUENCE IF NOT EXISTS public.users_id_seq
-INCREMENT 1
-START 1
-MINVALUE 1
-MAXVALUE 9223372036854775807
-CACHE 1;
+    INCREMENT 1
+    START 1
+    MINVALUE 1
+    MAXVALUE 9223372036854775807
+    CACHE 1;
 
 CREATE TABLE forums
 (
     id INTEGER DEFAULT nextval('"Forum_id_seq"'::regclass) PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
-    user_nick CITEXT NOT NULL,
+    user_nick CITEXT NOT NULL 'author_id integer fk',
     slug CITEXT NOT NULL,
     posts INTEGER DEFAULT 0,
     threads INTEGER DEFAULT 0
@@ -56,11 +56,11 @@ CREATE TABLE posts
 (
     id INTEGER DEFAULT nextval('posts_id_seq'::regclass) PRIMARY KEY NOT NULL,
     parent INTEGER,
-    author CITEXT NOT NULL,
+    author CITEXT NOT NULL 'author_id integer fk',
     message TEXT NOT NULL,
     isedited BOOLEAN DEFAULT false,
-    forum CITEXT NOT NULL,
-    thread INTEGER,
+    forum CITEXT NOT NULL, 'изменить на forum_id integer fk и нужен ли?'
+    thread INTEGER,'thread_id not null fk'
     created TIMESTAMP DEFAULT now() NOT NULL
 );
 
@@ -76,8 +76,8 @@ CREATE TABLE threads
 (
     id INTEGER DEFAULT nextval('thread_id_seq'::regclass) PRIMARY KEY NOT NULL,
     title CITEXT NOT NULL,
-    author CITEXT NOT NULL,
-    forum CITEXT,
+    author CITEXT NOT NULL 'author_id integer fk',
+    forum CITEXT 'изменить на forum_id integer fk',
     message TEXT NOT NULL,
     votes INTEGER DEFAULT 0,
     slug CITEXT,
@@ -103,7 +103,6 @@ CREATE TABLE users
     email CITEXT NOT NULL
 );
 
-
 COMMENT ON COLUMN users.nickname IS 'Имя пользователя (уникальное поле). Данное поле допускает только латиницу, цифры и знак подчеркивания. Сравнение имени регистронезависимо.';
 COMMENT ON COLUMN users.fullname IS 'Полное имя пользователя.';
 COMMENT ON COLUMN users.about IS 'Описание пользователя.';
@@ -113,26 +112,40 @@ COMMENT ON COLUMN users.id IS 'id юзера';
 
 CREATE TABLE votes
 (
-    nickname CITEXT NOT NULL,
+    nickname CITEXT NOT NULL 'author_id integer fk',
     voice SMALLINT NOT NULL,
-    thread_id INTEGER
+    thread_id INTEGER,
+    PRIMARY KEY (nickname, thread_id)
 );
+
 COMMENT ON COLUMN votes.nickname IS 'Ник пользователя';
 COMMENT ON COLUMN votes.voice IS 'Отданный голос.';
 
 
 ALTER TABLE forums ADD FOREIGN KEY (user_nick) REFERENCES users (nickname);
-CREATE UNIQUE INDEX forums_slug_uindex ON forums (slug);
+ALTER TABLE posts ADD FOREIGN KEY (thread) REFERENCES threads (id); 'Добавили'
+ALTER TABLE posts ADD FOREIGN KEY (parent) REFERENCES posts (id); 'Добавили'
 ALTER TABLE posts ADD FOREIGN KEY (author) REFERENCES users (nickname);
 ALTER TABLE posts ADD FOREIGN KEY (forum) REFERENCES forums (slug);
-CREATE UNIQUE INDEX posts_id_uindex ON posts (id);
 ALTER TABLE threads ADD FOREIGN KEY (author) REFERENCES users (nickname);
 ALTER TABLE threads ADD FOREIGN KEY (forum) REFERENCES forums (slug);
-CREATE UNIQUE INDEX "Thread_id_uindex" ON threads (id);
-CREATE UNIQUE INDEX thread_author_title_uindex ON threads (author, title);
-CREATE UNIQUE INDEX "User_nickname_uindex" ON users (nickname);
-CREATE UNIQUE INDEX "User_email_uindex" ON users (email);
-CREATE UNIQUE INDEX users_id_uindex ON users (id);
+
+-- CREATE UNIQUE INDEX posts_id_uindex ON posts (id);
+-- CREATE UNIQUE INDEX "Thread_id_uindex" ON threads (id);
+CREATE UNIQUE INDEX forums_slug_uindex ON forums (slug); 'lower(slug)'
+CREATE UNIQUE INDEX thread_author_title_uindex ON threads (author, title); 'изменить индекс на title{, forum?}'
+CREATE UNIQUE INDEX "User_nickname_uindex" ON users (nickname); 'lower(nickname)'
+CREATE UNIQUE INDEX "User_email_uindex" ON users (email); 'lower(lower)'
+
+
+CREATE INDEX "Post_thread" ON posts (thread);
+CREATE INDEX "Post_parent_thread_id" ON posts (parent, thread, id); 'для поиска в рекурсивных запросах добавили thread, id'
+CREATE INDEX "Thread_forum" ON threads (forum);
+
+-- CREATE UNIQUE INDEX users_id_uindex ON users (id);
+
 ALTER TABLE votes ADD FOREIGN KEY (nickname) REFERENCES users (nickname);
 ALTER TABLE votes ADD FOREIGN KEY (thread_id) REFERENCES threads (id);
-CREATE UNIQUE INDEX table_name_nickname_uindex ON votes (nickname);
+CREATE UNIQUE INDEX table_name_nickname_uindex ON votes (nickname); 'сделать двойной индекс по thread_id, nickname'
+
+

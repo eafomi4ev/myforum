@@ -99,10 +99,18 @@ public final class ForumDAO {
 
     public List<UserModel> getUsersInForum(String forumSlug, Integer limit, String since, boolean desc) {
         final List<Object> arguments = new ArrayList<>();
+//        Вместо строк c подзапросом
+//        WITH forumThreads (id, author) AS (
+//                SELECT id, author FROM threads t WHERE t.forum = ?)
+//        SELECT DISTINCT author FROM forumThreads
+//                UNION
+//        SELECT DISTINCT author FROM posts p JOIN forumThreads f ON p.thread = f.id;
         StringBuffer sql = new StringBuffer("SELECT * from users u WHERE nickname IN (" +
                 "SELECT DISTINCT u.nickname FROM users u JOIN posts p on p.author = u.nickname WHERE lower(p.forum) = lower(?)" +
                 " UNION" +
                 "  SELECT DISTINCT u.nickname FROM users u JOIN threads t on t.author = u.nickname WHERE lower(t.forum) = lower(?))");
+
+        //Убрать добавление одного аргумента
         arguments.add(forumSlug);
         arguments.add(forumSlug);
 
@@ -132,7 +140,7 @@ public final class ForumDAO {
 
 
     //Преобразование
-    private static final class ForumModelMapper implements RowMapper<ForumModel> {
+    private final class ForumModelMapper implements RowMapper<ForumModel> {
         @Override
         public ForumModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
             ForumModel forum = new ForumModel(resultSet.getString("title"),

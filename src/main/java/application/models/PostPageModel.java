@@ -15,7 +15,7 @@ public class PostPageModel {
     private String marker;
     private List<PostModel> posts;
 
-    private static final ObjectMapper mapper = new ObjectMapper().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
+    private final ObjectMapper mapper = new ObjectMapper().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
 
     public PostPageModel(String marker, List<PostModel> posts) {
         this.marker = marker;

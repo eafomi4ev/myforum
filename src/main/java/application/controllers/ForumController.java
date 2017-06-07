@@ -5,6 +5,7 @@ import application.models.ThreadModel;
 import application.models.UserModel;
 import application.services.ForumDAO;
 import application.services.ThreadDAO;
+import application.services.UserDAO;
 import application.support.ResponseMsg;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,10 +32,12 @@ public final class ForumController {
 
     private ForumDAO forumServiceDAO;
     private ThreadDAO threadServiceDAO;
+    private UserDAO userServiceDAO;
 
-    public ForumController(ForumDAO forumServiceDAO, ThreadDAO threadServiceDAO) {
+    public ForumController(ForumDAO forumServiceDAO, ThreadDAO threadServiceDAO, UserDAO userServiceDAO) {
         this.forumServiceDAO = forumServiceDAO;
         this.threadServiceDAO = threadServiceDAO;
+        this.userServiceDAO = userServiceDAO;
     }
 
 

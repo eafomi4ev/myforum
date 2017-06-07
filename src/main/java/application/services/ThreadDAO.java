@@ -193,7 +193,9 @@ public final class ThreadDAO {
 
     private List<PostModel> getPostsInTreeSort(int threadId, Integer limit, int marker, boolean desc) {
         final List<Object> arguments = new ArrayList<>();
-        StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM posts " +
+//       array_append('{}'::INTEGER[], id)
+//        Здесь будет view вместо posts
+        StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id)  FROM posts " +
                 "WHERE parent = 0 AND thread = ? UNION ALL SELECT p.id, array_append(path, p.id) FROM posts p JOIN " +
                 "rec ON rec.id = p.parent AND p.thread = ?) SELECT p.* FROM rec JOIN " +
                 "posts p ON rec.id = p.id ORDER BY rec.path");
@@ -224,10 +226,11 @@ public final class ThreadDAO {
     }
 
     private List<PostModel> getPostsInParentTreeSort(int threadId, Integer limit, int marker, boolean desc) {
-
+//        array_append('{}'::INTEGER[], id)
+//        DISTINCT
         final ArrayList<Object> parameters = new ArrayList<>();
         StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM " +
-                "(SELECT DISTINCT id FROM posts WHERE thread = ? AND parent = 0 ORDER BY id ");
+                "(SELECT id FROM posts WHERE thread = ? AND parent = 0 ORDER BY id ");
         parameters.add(threadId);
 
         if (desc) {
@@ -244,12 +247,13 @@ public final class ThreadDAO {
             parameters.add(marker);
         }
 
-        sql.append(") roots " +
+        sql.append(") roots " + //roots надо?
                 "UNION ALL " +
                 "SELECT p.id, array_append(path, p.id) FROM posts p " +
                 "JOIN rec ON rec.id = p.parent) " +
                 "SELECT p.* FROM rec JOIN posts p ON rec.id = p.id ORDER BY rec.path ");
 
+        //Посмотреть доку про сортировку постов asc desc
         if (desc) {
             sql.append(" DESC ");
         }
@@ -299,7 +303,7 @@ public final class ThreadDAO {
 
     }
 
-    protected static final class VoteModelMapper implements RowMapper<VoteModel> {
+    protected final class VoteModelMapper implements RowMapper<VoteModel> {
 
         @Override
         public VoteModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {

@@ -122,7 +122,7 @@ public final class UserDAO {
         }
     }
 
-//    public static UserModel read(ResultSet rs, int rowNum) throws SQLException {
+//    public UserModel read(ResultSet rs, int rowNum) throws SQLException {
 //        return new UserModel(
 //                rs.getInt("id"),
 //                rs.getString("about"),
