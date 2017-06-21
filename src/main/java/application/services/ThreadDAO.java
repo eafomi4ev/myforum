@@ -1,319 +1,177 @@
 package application.services;
 
-import application.models.PostModel;
+
+import application.Instances;
+import application.models.ForumModel;
 import application.models.ThreadModel;
-import application.models.VoteModel;
+import application.models.ThreadUpdateModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
-/**
- * Created by egor on 15.03.17.
- */
-@Service
-public final class ThreadDAO {
+@Repository
+@Transactional
+public class ThreadDAO {
 
     private JdbcTemplate jdbcTemplate;
 
-    public ThreadDAO(JdbcTemplate jdbcTemplate) {
+    @Autowired
+    public ThreadDAO(JdbcTemplate jdbcTemplate){
         this.jdbcTemplate = jdbcTemplate;
     }
 
-
-    public List<PostModel> getPostsInThread(int threadId) {
-
-        String sql = "SELECT * FROM posts WHERE thread = ?";
-        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadId}, new PostDAO.PostModelMapper());
-        return posts;
-    }
-
-    public List<PostModel> getPostsInThreadWithParent(int threadId, List<Integer> parentsID) {
-        System.out.println();
-        StringBuffer parentsIDString = new StringBuffer("(");
-        for (Integer id : parentsID) {
-            parentsIDString.append(id.toString()).append(',');
-        }
-        parentsIDString.setCharAt(parentsIDString.length() - 1, ')');
-//        parentsIDString.deleteCharAt(parentsIDString.length() - 1);
-        System.out.println(parentsIDString.toString());
-        StringBuffer sql = new StringBuffer("SELECT * FROM posts WHERE thread = ? AND parent IN ").append(parentsIDString.toString());
-        List<PostModel> posts = jdbcTemplate.query(sql.toString(), new Object[]{threadId}, new PostDAO.PostModelMapper());
-        return posts;
-    }
-
-    public List<PostModel> getPostsInThread(String threadSlug) {
-        String sql = "SELECT * FROM posts WHERE thread = ?";
-        List<PostModel> posts = jdbcTemplate.query(sql, new Object[]{threadSlug}, new PostDAO.PostModelMapper());
-        return posts;
-    }
-
-    public void createPost(PostModel post) { //todo Сделать keyHolder и возвращать id добавленного поста
-
-//        PreparedStatementCreator preparedStatement = new PreparedStatementCreator() {
-//            @Override
-//            public PreparedStatement createPreparedStatement(Connection con) throws SQLException {
-//
-//                StringBuffer sql = new StringBuffer("INSERT INTO posts (parent, author, message, isedited, forum, thread, created) ")
-//                        .append(
-//                                "VALUES(" +
-//                                        "?, " +
-//                                        "(SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), " +
-//                                        "?, " +
-//                                        "?, " +
-//                                        "(SELECT forum FROM threads WHERE id = ?), " +
-//                                        "? ,")
-//                        .append(post.getCreated() == null ? "DEFAULT" : post.getCreated())
-//                        .append(")");
-//
-//
-//                PreparedStatement ps = con.prepareStatement(sql.toString());
-//
-//                ps.setInt(1, post.getParent());
-//                ps.setString(2, post.getAuthor());
-//                ps.setString(3, post.getMessage());
-//                ps.setBoolean(4, post.getIsEdited());
-//                ps.setInt(5, post.getThread());
-//                ps.setInt(6, post.getThread());
-////                ps.setTimestamp(7, post.getCreated() == null ? DEFAULT : post.getCreated());
-//                return ps;
-//            }
-//        };
-//
-//        KeyHolder keyHolder = new GeneratedKeyHolder();
-//
-//        jdbcTemplate.update(preparedStatement, keyHolder);
-//
-//        return keyHolder.getKey().intValue();
-//
-        if (post.getParent() != 0) {
-            PostDAO postDAO = new PostDAO(jdbcTemplate);
-            PostModel parentPost = postDAO.getPostByID(post.getParent());
-            if (post.getThread() != parentPost.getThread()) {
-                throw new IllegalArgumentException("Родительский пост отсутствует в ветке");
-            }
-        }
-
-        StringBuffer sql = new StringBuffer("INSERT INTO posts (parent, author, message, isedited, forum, thread, created) " +
-                "VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, " +
-                "(SELECT forum FROM threads WHERE id = ?), ?, ");
-
-        if (post.getCreated() == null) {
-            sql.append("DEFAULT )");
+    public void create(ThreadModel thread) {
+        String sql;
+        Object[] object;
+        if (thread.getCreated() == null) {
+            sql = "INSERT INTO threads (title, user_id, forum_id, message, slug) VALUES (?, ?, ?, ?, ?) RETURNING id;";
+            object = new Object[]{thread.getTitle(), thread.getUserId(), thread.getForumId(), thread.getMessage(), thread.getSlug()};
         } else {
-            sql.append("'").append(post.getCreated().toString()).append("')");
+            Timestamp timestamp = Instances.getTimestampFromString(thread.getCreated());
+
+            sql = "INSERT INTO threads (title, user_id, forum_id, message, slug, created) VALUES (?, ?, ?, ?, ?, ?) RETURNING id;";
+            object = new Object[]{thread.getTitle(), thread.getUserId(), thread.getForumId(), thread.getMessage(), thread.getSlug(), timestamp};
         }
+        thread.setId(jdbcTemplate.queryForObject(sql, object, Integer.class));
 
-        jdbcTemplate.update(sql.toString(), post.getParent(), post.getAuthor(), post.getMessage(),
-                post.getIsEdited(), post.getThread(), post.getThread());
-        sql.setLength(0);
-
-        sql.append("UPDATE forums SET posts = posts + 1 WHERE slug = (SELECT forum FROM threads WHERE id = ?)"); //todo: сделать keyHolder, обновлять запись в forums по id
-        jdbcTemplate.update(sql.toString(), post.getThread());
+        jdbcTemplate.update("UPDATE forums SET threads = threads + 1 WHERE id = ?;", thread.getForumId());
     }
 
-    public PostModel getLastAddedPost() {
-        String sql = "SELECT * FROM posts WHERE id = (SELECT max(id) FROM posts)";
-        return jdbcTemplate.query(sql, new PostDAO.PostModelMapper()).get(0);
+    public ThreadModel getByIdWithForumData(Integer id) {
+        String sql = "SELECT t.id AS t_id, f.id AS f_id, f.slug AS f_slug FROM threads t JOIN forums f ON f.id=t.forum_id WHERE t.id=?;";
+        return jdbcTemplate.queryForObject(sql, new ThreadForumMapper(), id);
     }
 
-    //TODO: разобраться с получением веток тут и в ForumDAO
-    public List<ThreadModel> getThreadBySlug(String threadSlug) {
-        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?)";
-        return jdbcTemplate.query(sql, new Object[]{threadSlug}, new ThreadModelMapper());
+    public ThreadModel getByIdWithFullData(Integer id) {
+        String sql = "SELECT t.id AS t_id, t.title AS t_title, nickname, t.message AS msg, " +
+                "t.slug AS t_slug, f.slug AS f_slug, created, votes " +
+                "FROM threads t " +
+                "JOIN forums f ON f.id=t.forum_id " +
+                "JOIN users u ON u.id=t.user_id "+
+                "WHERE t.id=?;";
+        return jdbcTemplate.queryForObject(sql, new ThreadForumUserMapper(), id);
     }
 
-    public List<ThreadModel> getThreadById(int id) { //todo: Должен возвращать 1 thread, а не List
-        String sql = "SELECT * FROM threads WHERE id = ?";
-        return jdbcTemplate.query(sql, new Object[]{id}, new ThreadModelMapper());
+    public ThreadModel getBySlugWithForumData(String slug) {
+        String sql = "SELECT t.id AS t_id, f.id AS f_id, f.slug AS f_slug FROM threads t JOIN forums f ON f.id=t.forum_id WHERE LOWER(t.slug) = LOWER(?);";
+        return jdbcTemplate.queryForObject(sql, new ThreadForumMapper(), slug);
     }
 
-    public void createVote(VoteModel vote, int threadId) {
-        String sql = "INSERT INTO votes (nickname, voice, thread_id) VALUES ((SELECT nickname FROM users WHERE" +
-                "  LOWER(users.nickname)=LOWER(?)), ?, ?) ON CONFLICT (nickname) DO UPDATE SET voice = ?;";
-
-        jdbcTemplate.update(sql.toString(), vote.getNickname(), vote.getVoice(), threadId, vote.getVoice());
-
-        sql = "UPDATE threads SET votes = (SELECT SUM(voice) FROM votes WHERE thread_id = ?) WHERE  id = ?";
-
-        jdbcTemplate.update(sql, threadId, threadId);
-
+    public ThreadModel getBySlugWithFullData(String slug) {
+        String sql = "SELECT t.id AS t_id, t.title AS t_title, nickname, t.message AS msg, " +
+                "t.slug AS t_slug, f.slug AS f_slug, created, votes " +
+                "FROM threads t " +
+                "JOIN forums f ON f.id=t.forum_id " +
+                "JOIN users u ON u.id=t.user_id " +
+                "WHERE LOWER(t.slug) = LOWER(?);";
+        return jdbcTemplate.queryForObject(sql, new ThreadForumUserMapper(), slug);
     }
 
-    public List<PostModel> getPostsInThread(int threadId, Integer limit, int marker, String sort, boolean desc) {
-        try {
-            if (sort.equals("flat")) {
-                return getPostsInFlatSort(threadId, limit, marker, desc);
+    public List<ThreadModel> getByForumId(ForumModel forum, Integer limit, String since, Boolean desc) {
+        StringBuilder sql = new StringBuilder("SELECT t.id AS t_id, " +
+                "t.title AS t_title, nickname, t.message AS msg, " +
+                "t.slug AS t_slug, f.slug AS f_slug, created, votes " +
+                "FROM threads t " +
+                "JOIN forums f ON f.id=t.forum_id " +
+                "JOIN users u ON u.id=t.user_id " +
+                "WHERE f.id = ? ");
+
+        List<Object> props = new ArrayList<>();
+        props.add(forum.getId());
+
+
+        if (since != null) {
+            sql.append("AND created ");
+
+            if (desc != null && desc) {
+                sql.append("<= ? ");
+            } else {
+                sql.append(">= ? ");
             }
-            if (sort.equals("tree")) {
-                return getPostsInTreeSort(threadId, limit, marker, desc);
-            }
-            if (sort.equals("parent_tree")) {
-                return getPostsInParentTreeSort(threadId, limit, marker, desc);
-            }
-            return null;
-        } catch (IndexOutOfBoundsException e) {
-            throw e;
+
+            Timestamp timestamp = Instances.getTimestampFromString(since);
+            props.add(timestamp);
         }
+
+        sql.append("ORDER BY created ");
+
+        if (desc != null && desc) {
+            sql.append("DESC ");
+        }
+
+        sql.append("LIMIT ?;");
+        props.add(limit);
+
+
+        return jdbcTemplate.query(sql.toString(), new ThreadForumUserMapper(), props.toArray());
     }
 
+    public void update(ThreadModel thread, ThreadUpdateModel threadUpdate) {
+        StringBuilder sql = new StringBuilder("UPDATE threads SET");
+        List<Object> props = new ArrayList<>();
 
-    private List<PostModel> getPostsInFlatSort(int threadId, Integer limit, int marker, boolean desc) {
-//        List<PostModel> posts;
-
-        StringBuffer sql = new StringBuffer("SELECT * FROM posts WHERE thread = ? ORDER BY created");
-
-        if (desc) {
-            sql.append(" DESC");
-        }
-
-        sql.append(", id");
-
-        if (desc) {
-            sql.append(" DESC");
-        }
-
-        sql.append(" LIMIT ? OFFSET ?");
-
-
-
-        try {
-            ThreadModel thread = getThreadById(threadId).get(0);
-        } catch (IndexOutOfBoundsException e) {
-            throw e;
-        }
-
-        return jdbcTemplate.query(sql.toString(), new Object[]{threadId, limit, marker}, new PostDAO.PostModelMapper());
-
-    }
-
-    private List<PostModel> getPostsInTreeSort(int threadId, Integer limit, int marker, boolean desc) {
-        final List<Object> arguments = new ArrayList<>();
-//       array_append('{}'::INTEGER[], id)
-//        Здесь будет view вместо posts
-        StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id)  FROM posts " +
-                "WHERE parent = 0 AND thread = ? UNION ALL SELECT p.id, array_append(path, p.id) FROM posts p JOIN " +
-                "rec ON rec.id = p.parent AND p.thread = ?) SELECT p.* FROM rec JOIN " +
-                "posts p ON rec.id = p.id ORDER BY rec.path");
-        arguments.add(threadId);
-        arguments.add(threadId);
-
-        if (desc) {
-            sql.append(" DESC");
-        }
-
-        sql.append(", id");
-
-        if (desc) {
-            sql.append(" DESC");
-        }
-
-        if (limit > 0) {
-            sql.append(" LIMIT ?");
-            arguments.add(limit);
-        }
-
-        if (marker > 0) {
-            sql.append(" OFFSET ?");
-            arguments.add(marker);
-        }
-
-        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new PostDAO.PostModelMapper());
-    }
-
-    private List<PostModel> getPostsInParentTreeSort(int threadId, Integer limit, int marker, boolean desc) {
-//        array_append('{}'::INTEGER[], id)
-//        DISTINCT
-        final ArrayList<Object> parameters = new ArrayList<>();
-        StringBuffer sql = new StringBuffer("WITH RECURSIVE rec (id, path) AS (SELECT id, array_append('{}'::INTEGER[], id) FROM " +
-                "(SELECT id FROM posts WHERE thread = ? AND parent = 0 ORDER BY id ");
-        parameters.add(threadId);
-
-        if (desc) {
-            sql.append(" DESC ");
-        }
-
-        if (limit > 0) {
-            sql.append(" LIMIT ? ");
-            parameters.add(limit);
-        }
-
-        if (marker > 0) {
-            sql.append(" OFFSET ? ");
-            parameters.add(marker);
-        }
-
-        sql.append(") roots " + //roots надо?
-                "UNION ALL " +
-                "SELECT p.id, array_append(path, p.id) FROM posts p " +
-                "JOIN rec ON rec.id = p.parent) " +
-                "SELECT p.* FROM rec JOIN posts p ON rec.id = p.id ORDER BY rec.path ");
-
-        //Посмотреть доку про сортировку постов asc desc
-        if (desc) {
-            sql.append(" DESC ");
-        }
-
-        return jdbcTemplate.query(sql.toString(), parameters.toArray(), new PostDAO.PostModelMapper());
-    }
-
-
-    public ThreadModel detailsUpdate(int threadID, ThreadModel thread) {
-
-        StringBuffer sql = new StringBuffer("UPDATE threads SET");
-        final List<Object> arguments = new ArrayList<>();
-        if (thread.getTitle() != null && !thread.getTitle().isEmpty()) {
+        if (threadUpdate.getTitle() != null) {
             sql.append(" title = ?,");
-            arguments.add(thread.getTitle());
-        }
+            props.add(threadUpdate.getTitle());
 
-        if (thread.getMessage() != null && !thread.getMessage().isEmpty()) {
+            thread.setTitle(threadUpdate.getTitle());
+        }
+        if (threadUpdate.getMessage() != null) {
             sql.append(" message = ?,");
-            arguments.add(thread.getMessage());
+            props.add(threadUpdate.getMessage());
+
+            thread.setMessage(threadUpdate.getMessage());
+        }
+        if (props.isEmpty()) {
+            return;
         }
 
-        if (arguments.size() != 0) {
-            sql.deleteCharAt(sql.length() - 1);
-            sql.append(" WHERE id = ?");
-            arguments.add(threadID);
-            jdbcTemplate.update(sql.toString(), arguments.toArray());
-        }
-        return getThreadById(threadID).get(0);
+        sql.deleteCharAt(sql.length() - 1);
+
+        sql.append(" WHERE id = ?;");
+        props.add(thread.getId());
+        jdbcTemplate.update(sql.toString(), props.toArray());
     }
 
+    private static class ThreadForumMapper implements RowMapper<ThreadModel> {
+        public ThreadModel mapRow(ResultSet rs, int rowNum) throws SQLException {
+            ThreadModel thread = new ThreadModel();
+            thread.setId(rs.getInt("t_id"));
+            thread.setForumId(rs.getInt("f_id"));
+            thread.setForum(rs.getString("f_slug"));
 
-        protected static final class ThreadModelMapper implements RowMapper<ThreadModel> {
-        @Override
-        public ThreadModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
-
-            return new ThreadModel(
-                    resultSet.getInt("id"),
-                    resultSet.getString("title"),
-                    resultSet.getString("author"),
-                    resultSet.getString("forum"),
-                    resultSet.getString("message"),
-                    resultSet.getInt("votes"),
-                    resultSet.getString("slug"),
-                    resultSet.getTimestamp("created"));
-        }
-
-    }
-
-    protected final class VoteModelMapper implements RowMapper<VoteModel> {
-
-        @Override
-        public VoteModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
-
-            return new VoteModel(
-                    resultSet.getString("nickname"),
-                    resultSet.getInt("voice"),
-                    resultSet.getInt("thread_id"));
+            return thread;
         }
     }
 
+    private static class ThreadForumUserMapper implements RowMapper<ThreadModel> {
+        public ThreadModel mapRow(ResultSet rs, int rowNum) throws SQLException {
+            ThreadModel thread = new ThreadModel();
+            thread.setId(rs.getInt("t_id"));
+            thread.setTitle(rs.getString("t_title"));
+            thread.setAuthor(rs.getString("nickname"));
+            thread.setMessage(rs.getString("msg"));
+            thread.setSlug(rs.getString("t_slug"));
+            thread.setForum(rs.getString("f_slug"));
 
+            Timestamp created = rs.getTimestamp("created");
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+            dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            thread.setCreated(dateFormat.format(created));
+
+            thread.setVotes(rs.getInt("votes"));
+
+            return thread;
+        }
+    }
 }

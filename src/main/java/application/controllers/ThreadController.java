@@ -1,192 +1,210 @@
 package application.controllers;
 
-import application.models.PostModel;
-import application.models.PostPageModel;
-import application.models.ThreadModel;
-import application.models.VoteModel;
-import application.services.ForumDAO;
+import application.models.*;
 import application.services.PostDAO;
 import application.services.ThreadDAO;
+import application.services.ThreadVoteDAO;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
+import java.sql.BatchUpdateException;
+import java.sql.SQLException;
 import java.util.List;
 
-/**
- * Created by egor on 15.03.17.
- */
-
 @RestController
-@RequestMapping(path = "/api/thread/{threadSlugOrID}")
-public final class ThreadController {
+@RequestMapping(path = "/api/thread")
+public class ThreadController {
+    private final ThreadDAO threadServiceDAO;
+    private final ThreadVoteDAO threadVoteServiceDAO;
+    private final PostDAO postServiceDAO;
 
-    private ThreadDAO threadServiceDAO;
-    private ForumDAO forumServiceDAO;
-    private PostDAO postServiceDAO;
-
-    public ThreadController(ThreadDAO threadServiceDAO, PostDAO postServiceDAO) {
+    @Autowired
+    ThreadController(ThreadDAO threadServiceDAO, ThreadVoteDAO threadVoteServiceDAO, PostDAO postServiceDAO) {
         this.threadServiceDAO = threadServiceDAO;
+        this.threadVoteServiceDAO = threadVoteServiceDAO;
         this.postServiceDAO = postServiceDAO;
     }
 
-    @RequestMapping(path = "/create")
-    public ResponseEntity create(@RequestBody List<PostModel> posts, @PathVariable("threadSlugOrID") String threadSlugOrID) {
-        int id;
+    @Nullable
+    private ThreadModel getBySlugOrIdJoinAll(final String slugOrId) {
+        final ThreadModel thread;
         try {
-            id = getThreadIdFromString(threadSlugOrID);//Содержит запрос к БД
-        } catch (IndexOutOfBoundsException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            if (slugOrId.matches("\\d+")) {
+                final Integer id = Integer.parseInt(slugOrId);
+                thread = threadServiceDAO.getByIdWithFullData(id);
+            } else {
+                thread = threadServiceDAO.getBySlugWithFullData(slugOrId);
+            }
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
+        return thread;
+    }
 
+
+    @PostMapping(path = "/{slugOrId}/create")
+    public ResponseEntity slugCreate(@PathVariable(name = "slugOrId") final String slugOrId,
+                                     @RequestBody List<PostModel> posts) {
         if (posts.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            return ResponseEntity.notFound().build();
         }
 
-        List<Integer> parentsID = new ArrayList<>();
-        List<PostModel> list = new ArrayList<>();
-//        Timestamp timestamp = new Timestamp(new Date().);
-//        final String created = LocalDateTime.now().toString();
-//        final Timestamp timestamp = Timestamp.valueOf(LocalDateTime.parse(created));
-
-
-        PostModel tmpPost = null;
-        for (int i = 0; i < posts.size(); i++) {
-            posts.get(i).setThread(id);
-            if (i != 0) {
-                posts.get(i).setCreated(tmpPost.getCreated());
+        ThreadModel thread;
+        try {
+            if (slugOrId.matches("\\d+")) {
+                final Integer id = Integer.parseInt(slugOrId);
+                thread = threadServiceDAO.getByIdWithForumData(id);
+            } else {
+                thread = threadServiceDAO.getBySlugWithForumData(slugOrId);
             }
-            try {
-                threadServiceDAO.createPost(posts.get(i));
-                if (i == 0) {
-                    tmpPost = threadServiceDAO.getLastAddedPost();
-                }
-                list.add(threadServiceDAO.getLastAddedPost());//TODO: Как-то запоминать id добавленных постов и потом вытаскивать их
-            } catch (DuplicateKeyException e) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(threadServiceDAO.getPostsInThread(id));//409
-            } catch (IndexOutOfBoundsException e) {
+        } catch (EmptyResultDataAccessException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.notFound().build();
+        }
+
+        final List<Integer> children = postServiceDAO.getChildren(thread.getId());
+        for (PostModel post : posts) {
+            if (post.getParent() != null &&
+                    post.getParent() != 0 &&
+                    !children.contains(post.getParent())) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).build();
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).build();
-            } catch (DataIntegrityViolationException e) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
         }
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(list);
+        try {
+            postServiceDAO.create(thread, posts);
+        } catch(BatchUpdateException e) {
+            return ResponseEntity.notFound().build();
+        } catch (DuplicateKeyException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(posts);
     }
 
-    @RequestMapping(path = "/vote")
-    public ResponseEntity createVote(@RequestBody VoteModel vote, @PathVariable("threadSlugOrID") String threadSlugOrID) {
-        int id;
-        try {
-            id = getThreadIdFromString(threadSlugOrID);
-        } catch (IndexOutOfBoundsException e) {
+    @GetMapping(path = "/{slugOrId}/details")
+    public ResponseEntity getSlugDetails(@PathVariable(name = "slugOrId") final String slugOrId) {
+
+        final ThreadModel thread = getBySlugOrIdJoinAll(slugOrId);
+        if (thread == null) {
             return ResponseEntity.notFound().build();
         }
 
+        return ResponseEntity.ok(thread);
 
-        List<ThreadModel> threads = threadServiceDAO.getThreadById(id);
-
-        if (threads.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        try {
-            threadServiceDAO.createVote(vote, id);
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.notFound().build();
-        }
-
-        threads = threadServiceDAO.getThreadById(id);// todo: Возможно как-то пересчитывать значение голосов непосредственно здесь и не ходить второй в БД
-
-
-        return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
     }
 
-    @RequestMapping(path = "/details", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity details(@PathVariable("threadSlugOrID") String threadSlugOrID) {
-        final List<ThreadModel> threads;
-        try {
-            threads = threadServiceDAO.getThreadById(getThreadIdFromString(threadSlugOrID));
-        } catch (IndexOutOfBoundsException e) {
+    @PostMapping(path = "/{slugOrId}/details")
+    public ResponseEntity setSlugDetails(@PathVariable(name = "slugOrId") final String slugOrId,
+                                         @RequestBody ThreadUpdateModel threadUpdate) {
+
+        final ThreadModel thread = getBySlugOrIdJoinAll(slugOrId);
+        if (thread == null) {
             return ResponseEntity.notFound().build();
         }
-        if (!threads.isEmpty()) {
-            return ResponseEntity.ok(threads.get(0));
+
+        threadServiceDAO.update(thread, threadUpdate);
+
+        return ResponseEntity.ok(thread);
+    }
+
+    @GetMapping(path = "/{slugOrId}/posts")
+    public ResponseEntity slugPosts(@PathVariable(name = "slugOrId") final String slugOrId,
+                                    @RequestParam(name = "limit", required = false, defaultValue = "0") final Integer limit,
+                                    @RequestParam(name = "marker", required = false, defaultValue = "0") final String marker,
+                                    @RequestParam(name = "sort", required = false, defaultValue = "flat") final String sort,
+                                    @RequestParam(name = "desc", required = false, defaultValue = "false") final Boolean desc) {
+        final ThreadModel thread = getBySlugOrIdJoinAll(slugOrId);
+        if (thread == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Integer offset;
+        if (marker.matches("\\d+")) {
+            offset = Integer.parseInt(marker);
         } else {
             return ResponseEntity.notFound().build();
         }
 
-
-    }
-
-    @RequestMapping(path = "/posts", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity posts(@PathVariable("threadSlugOrID") String threadSlugOrID,
-                                @RequestParam(value = "limit", required = false, defaultValue = "null") Integer limit,
-                                @RequestParam(value = "marker", required = false, defaultValue = "0") int marker,
-                                @RequestParam(value = "sort", required = false, defaultValue = "flat") String sort,
-                                @RequestParam(value = "desc", required = false, defaultValue = "false") boolean descString) {
-        int threadID;
+        final PostsModel posts = new PostsModel();
+        Integer size;
         try {
-            threadID = getThreadIdFromString(threadSlugOrID);
-        } catch (IndexOutOfBoundsException e) {
+            switch (sort) {
+                case "flat":
+                    posts.setPosts(postServiceDAO.getPostsFlat(thread, limit, offset, desc));
+                    size = posts.getPosts().size();
+                    break;
+                case "tree":
+                    posts.setPosts(postServiceDAO.getPostsTree(thread, limit, offset, desc));
+                    size = posts.getPosts().size();
+                    break;
+                case "parent_tree":
+                    final List<Integer> parents = postServiceDAO.getParents(thread, limit, offset, desc);
+                    size = parents.size();
+                    posts.setPosts(postServiceDAO.getPostsParentTree(thread, desc, parents));
+                    break;
+                default:
+                    return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.notFound().build();
         }
 
-        List<PostModel> posts;
-        try {
-            posts = threadServiceDAO.getPostsInThread(threadID, limit, marker, sort, descString);
-        } catch (IndexOutOfBoundsException e) {
-            return ResponseEntity.notFound().build();
-        }
-        if (!posts.isEmpty())
-            marker += limit;
+        offset += size;
+        posts.setMarker(offset.toString());
 
-
-        PostPageModel postPage = new PostPageModel(Integer.toString(marker), posts);
-
-        return ResponseEntity.ok(postPage);
-
-
+        return ResponseEntity.ok(posts);
     }
 
-    @RequestMapping(path = "/details", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity detailsUpdate(@PathVariable("threadSlugOrID") String threadSlugOrID, @RequestBody ThreadModel thread) {
-        int threadID;
-        try {
-            threadID = getThreadIdFromString(threadSlugOrID);
-        } catch (IndexOutOfBoundsException e) {
+    @PostMapping(path = "/{slugOrId}/vote")
+    public ResponseEntity slugVote(@PathVariable(name = "slugOrId") final String slugOrId,
+                                   @RequestBody ThreadVoteModel vote) {
+
+        final ThreadModel thread = getBySlugOrIdJoinAll(slugOrId);
+        if (thread == null) {
             return ResponseEntity.notFound().build();
         }
 
+        ThreadVoteModel existingVote;
         try {
-            threadServiceDAO.detailsUpdate(threadID, thread);
-            return ResponseEntity.ok().body(threadServiceDAO.getThreadById(threadID).get(0));
-        } catch (NullPointerException e) {
-            return ResponseEntity.status(HttpStatus.OK).body(threadServiceDAO.getThreadById(threadID).get(0));
-        } catch (IndexOutOfBoundsException e) {
+            existingVote = threadVoteServiceDAO.get(thread, vote);
+        } catch (EmptyResultDataAccessException e) {
+            existingVote = null;
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.notFound().build();
         }
 
-
-    }
-
-
-    private int getThreadIdFromString(String threadSlugOrID) {
-        int id;
         try {
-            id = Integer.parseInt(threadSlugOrID);
-        } catch (NumberFormatException e) {
-            final List<ThreadModel> tmpThread = threadServiceDAO.getThreadBySlug(threadSlugOrID);
-            id = tmpThread.get(0).getId();
+            if (existingVote == null) {
+                threadVoteServiceDAO.create(thread, vote);
+            } else {
+                vote.setId(existingVote.getId());
+                threadVoteServiceDAO.insert(thread, vote);
+            }
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.notFound().build();
         }
-        return id;
+
+        return ResponseEntity.ok(thread);
     }
-
-
 }

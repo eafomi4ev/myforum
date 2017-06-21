@@ -1,25 +1,24 @@
 package application.models;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
-/**
- * Created by egor on 19.03.17.
- */
-
-
-public class PostPageModel {
-
+public class PostsModel {
+    @JsonProperty
     private String marker;
+
+    @JsonProperty
     private List<PostModel> posts;
 
-    private final ObjectMapper mapper = new ObjectMapper().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
-
-    public PostPageModel(String marker, List<PostModel> posts) {
+    @JsonCreator
+    public PostsModel(@JsonProperty("marker") String marker, @JsonProperty("posts") List<PostModel> posts){
         this.marker = marker;
         this.posts = posts;
+    }
+
+    public PostsModel(){
     }
 
     public String getMarker() {
@@ -37,5 +36,4 @@ public class PostPageModel {
     public void setPosts(List<PostModel> posts) {
         this.posts = posts;
     }
-
 }

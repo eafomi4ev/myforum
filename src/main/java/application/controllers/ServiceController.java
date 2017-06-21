@@ -1,45 +1,45 @@
 package application.controllers;
 
+
+import application.models.ServiceModel;
 import application.services.ServiceDAO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.HashMap;
-import java.util.Map;
-
-/**
- * Created by egor on 21.03.17.
- */
 
 @RestController
 @RequestMapping(path = "/api/service")
-public final class ServiceController {
+public class ServiceController {
+    private ServiceDAO serviceDAO;
 
-    private ServiceDAO serviceServiceDAO;
-
-    public ServiceController(ServiceDAO serviceServiceDAO) {
-        this.serviceServiceDAO = serviceServiceDAO;
+    @Autowired
+    ServiceController(ServiceDAO serviceDAO) {
+        this.serviceDAO = serviceDAO;
     }
 
-    @RequestMapping(path = "/status", method = RequestMethod.GET)
-    public ResponseEntity status() {
-        Map<String, Object> statusMap = new HashMap<>();
-        statusMap.put("user", serviceServiceDAO.getCountUsers());
-        statusMap.put("forum", serviceServiceDAO.getCountForums());
-        statusMap.put("thread", serviceServiceDAO.getCountThreads());
-        statusMap.put("post", serviceServiceDAO.getCountPosts());
-
-        return ResponseEntity.ok(statusMap);
-    }
-
-    @RequestMapping(path = "/clear", method = RequestMethod.POST)
+    @PostMapping(path = "/clear")
     public ResponseEntity clear() {
-        serviceServiceDAO.clearDataBase();
+        try{
+            serviceDAO.clear();
+        } catch (Exception e){
+            e.printStackTrace();
+        }
 
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping(path = "/status")
+    public ResponseEntity status() {
+        ServiceModel service = new ServiceModel();
+        service.setUser(serviceDAO.getCountUsers());
+        service.setForum(serviceDAO.getCountForums());
+        service.setThread(serviceDAO.getCountThreads());
+        service.setPost(serviceDAO.getCountPost());
 
+        return ResponseEntity.ok(service);
+    }
 }
+

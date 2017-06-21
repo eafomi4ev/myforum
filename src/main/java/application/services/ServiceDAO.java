@@ -1,45 +1,42 @@
 package application.services;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Created by egor on 21.03.17.
- */
-@Service
+@Repository
+@Transactional
 public class ServiceDAO {
+    private final JdbcTemplate jdbcTemplate;
 
-    private JdbcTemplate jdbcTemplate;
-
-    public ServiceDAO(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    @Autowired
+    public ServiceDAO(JdbcTemplate template){
+        this.jdbcTemplate = template;
     }
 
-    public Object getCountUsers() {
-        String sql = "SELECT COUNT(*) FROM users";
+    public int getCountUsers() {
+        final String sql = "SELECT count(*) FROM users;";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
-    public Object getCountForums() {
-        String sql = "SELECT COUNT(*) FROM forums";
+    public int getCountForums() {
+        final String sql = "SELECT count(*) FROM forums;";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
-    public Object getCountThreads() {
-        String sql = "SELECT COUNT(*) FROM threads";
+    public int getCountThreads() {
+        final String sql = "SELECT count(*) FROM threads;";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
-    public Object getCountPosts() {
-        String sql = "SELECT COUNT(*) FROM posts";
+    public int getCountPost() {
+        final String sql = "SELECT count(*) FROM posts;";
         return jdbcTemplate.queryForObject(sql, Integer.class);
     }
 
-    public void clearDataBase() {
-        jdbcTemplate.update("DELETE FROM posts");
-        jdbcTemplate.update("DELETE FROM votes");
-        jdbcTemplate.update("DELETE FROM threads");
-        jdbcTemplate.update("DELETE FROM forums");
-        jdbcTemplate.update("DELETE FROM users");
+    public void clear() {
+        final String sql = "TRUNCATE TABLE users, forums, threads, votes, posts, forum_users CASCADE;";
+        jdbcTemplate.execute(sql);
     }
 }

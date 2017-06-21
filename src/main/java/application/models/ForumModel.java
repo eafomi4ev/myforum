@@ -1,32 +1,29 @@
 package application.models;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-/**
- * Created by egor on 10.03.17.
- */
 
 public class ForumModel {
     @JsonProperty
+    private int id;
+    @JsonProperty
     private String title;
-
     @JsonProperty
     private String user;
-
     @JsonProperty
     private String slug;
-
     @JsonProperty
     private int posts;
-
     @JsonProperty
     private int threads;
+    @JsonIgnore
+    private int userId;
 
     @JsonCreator
-    public ForumModel(@JsonProperty("title") String title, @JsonProperty("user") String user, @JsonProperty("slug") String slug,
-                      @JsonProperty("post") int posts, @JsonProperty("threads") int threads) {
-
+    public ForumModel(@JsonProperty("title") String title, @JsonProperty("user") String user,
+                 @JsonProperty("slug") String slug, @JsonProperty("posts") int posts,
+                 @JsonProperty("threads") int threads) {
         this.title = title;
         this.user = user;
         this.slug = slug;
@@ -34,8 +31,18 @@ public class ForumModel {
         this.threads = threads;
     }
 
-    public String getTitle() {
+    public ForumModel() {
+    }
 
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
         return title;
     }
 
@@ -75,6 +82,11 @@ public class ForumModel {
         this.threads = threads;
     }
 
+    public int getUserId() {
+        return userId;
+    }
 
-
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
 }

@@ -1,134 +1,120 @@
 package application.services;
 
+import application.models.ForumModel;
 import application.models.UserModel;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
-/**
- * Created by egor on 06.03.17.
- */
-@Service
-public final class UserDAO {
+@Repository
+@Transactional
+public class UserDAO {
+    private static final UserModelMapper userModelMapper = new UserModelMapper();
 
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
-    public UserDAO(@NotNull JdbcTemplate jdbcTemplate) {
+    @Autowired
+    public UserDAO(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public final void insert(final UserModel user) {
-        String sql = "INSERT INTO users (nickname, fullname, about, email) VALUES(?, ?, ?, ?)";
-        jdbcTemplate.update(sql, user.getNickname(), user.getFullname(), user.getAbout(), user.getEmail());
+    public void create(final UserModel user) {
+        final String SQL = "INSERT INTO users (nickname, fullname, email, about) VALUES(?, ?, ?, ?)";
+        jdbcTemplate.update(SQL, user.getNickname(), user.getFullname(), user.getEmail(), user.getAbout());
     }
 
-    public final UserModel get(final String nickName) {
+    public List<UserModel> get(final UserModel user) {
+        String sql = "SELECT * FROM users WHERE lower(nickname)=lower(?) OR lower(email)=lower(?)";
+        return jdbcTemplate.query(sql, new Object[]{user.getNickname(), user.getEmail()}, userModelMapper);
+    }
+
+    public UserModel get(final String nickName) {
         String sql = "SELECT * FROM users WHERE lower(nickname)=lower(?)";
-        UserModel user = jdbcTemplate.queryForObject(sql, new Object[]{nickName}, new UserModelMapper());
+        UserModel user = jdbcTemplate.queryForObject(sql, new Object[]{nickName}, userModelMapper);
         return user;
     }
 
-    public final List<UserModel> get(final String nickName, final String email) {
-        String sql = "SELECT * FROM users WHERE lower(nickname)=lower(?) OR lower(email)=lower(?)";
-        return jdbcTemplate.query(sql, new Object[]{nickName, email}, new UserModelMapper());
-    }
+    public void updateUserProfile(final UserModel user) {
+        final StringBuilder sql = new StringBuilder("UPDATE users SET");
+        final List<Object> userProperties = new ArrayList<>();
 
-//    public final List<UserModel> get(UserModel user) {
-//        String sql = "SELECT * FROM users WHERE lower(nickname)=lower(?) OR lower(email)=lower(?)";
-//        return jdbcTemplate.query(sql, new Object[]{user.getNickname(), user.getEmail()}, new UserModelMapper());
-//    }
-
-    public final UserModel updateUserProfile(final String nickName, final UserModel user) {
-        UserModel newUser = null;
-        try {
-            newUser = get(nickName);
-        } catch (EmptyResultDataAccessException e){
-            return null;
+        if (user.getFullname() != null && !user.getFullname().isEmpty()) {
+            sql.append(" fullname = ?,");
+            userProperties.add(user.getFullname());
         }
 
-        if (Objects.isNull(newUser)) {
-            return null;
+        if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+            sql.append(" email = ?,");
+            userProperties.add(user.getEmail());
         }
 
-        StringBuffer sql = new StringBuffer("UPDATE users SET ");
-        boolean isFirstArgumentAdded = false;
-//        UserModel newUser = get(nickName);
-
-        /*Этот if не перемещать, другие if перед ним не ставить, тк в первом if гарантировано isFirstArgumentAdded = false*/
-        if (!StringUtils.isEmpty(user.getNickname())) {
-            sql.append("nickname = '" + user.getNickname() + "',");
-            newUser.setNickname(user.getNickname());
-            isFirstArgumentAdded = true;
-        }
-        if (!StringUtils.isEmpty(user.getFullname())) {
-            sql.append("fullname = '" + user.getFullname() + "',");
-            newUser.setFullname(user.getFullname());
-            isFirstArgumentAdded = true;
+        if (user.getAbout() != null && !user.getAbout().isEmpty()) {
+            sql.append(" about = ?,");
+            userProperties.add(user.getAbout());
         }
 
-        if (!StringUtils.isEmpty(user.getAbout())) {
-            sql.append("about = '" + user.getAbout() + "',");
-            newUser.setAbout(user.getAbout());
-            isFirstArgumentAdded = true;
-
-        }
-        if (!StringUtils.isEmpty(user.getEmail())) {
-            sql.append("email = '" + user.getEmail() + "',");
-            newUser.setEmail(user.getEmail());
-            isFirstArgumentAdded = true;
-
-        }
-
-        if (!isFirstArgumentAdded) {
-//                UserModel tmpUser = get(nickName);
-            return newUser;
-
+        if (userProperties.isEmpty()) {
+            return;
         }
 
         sql.deleteCharAt(sql.length() - 1);
-
-        sql.append(" WHERE nickname = '").append(nickName).append("'");
-
-        int count = jdbcTemplate.update(sql.toString());
-
-        if (count == 0) {
-            return null;
-        }
-
-        return newUser;
-
+        sql.append(" WHERE LOWER(nickname) = LOWER(?);");
+        userProperties.add(user.getNickname());
+        jdbcTemplate.update(sql.toString(), userProperties.toArray());
     }
 
+    public List<UserModel> getUsersInForum(final ForumModel forum, final Integer limit, final String since, final Boolean desc) {
+        final StringBuilder sql = new StringBuilder(
+                "SELECT u.id, nickname, fullname, email, about " +
+                "FROM users u " +
+                "WHERE u.id IN (" +
+                "SELECT user_id " +
+                "FROM forum_users " +
+                "WHERE forum_id = ?) ");
 
-    //Преобразование
-    public static final class UserModelMapper implements RowMapper<UserModel> {
+        final List<Object> props = new ArrayList<>();
+        props.add(forum.getId());
 
-        @Override
-        public UserModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
-            UserModel user = new UserModel(resultSet.getString("nickname"),
-                    resultSet.getString("fullname"),
-                    resultSet.getString("about"),
-                    resultSet.getString("email"));
+        if (since != null) {
+            if (desc != null && desc) {
+                sql.append("AND LOWER(nickname) < LOWER(?) ");
+            } else {
+                sql.append("AND LOWER(nickname) > LOWER(?) ");
+            }
+            props.add(since);
+        }
+
+        sql.append("ORDER BY nickname ");
+        if (desc != null) {
+            sql.append((desc ? "DESC " : "ASC "));
+        }
+        if (limit != null) {
+            sql.append("LIMIT ? ");
+            props.add(limit);
+        }
+
+        sql.append(";");
+
+        return jdbcTemplate.query(sql.toString(), props.toArray(), userModelMapper);
+    }
+
+    private static final class UserModelMapper implements RowMapper<UserModel> {
+        public UserModel mapRow(ResultSet rs, int rowNum) throws SQLException {
+            final UserModel user = new UserModel();
+            user.setId(rs.getInt("id"));
+            user.setNickname(rs.getString("nickname"));
+            user.setFullname(rs.getString("fullname"));
+            user.setEmail(rs.getString("email"));
+            user.setAbout(rs.getString("about"));
+
             return user;
-
         }
     }
-
-//    public UserModel read(ResultSet rs, int rowNum) throws SQLException {
-//        return new UserModel(
-//                rs.getInt("id"),
-//                rs.getString("about"),
-//                rs.getString("email"),
-//                rs.getString("fullname"),
-//                rs.getString("nickname")
-//        );
-//    }
 }

@@ -1,156 +1,68 @@
 package application.services;
 
+
 import application.models.ForumModel;
-import application.models.ThreadModel;
-import application.models.UserModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.List;
 
-/**
- * Created by egor on 06.03.17.
- */
-@Service
-public final class ForumDAO {
+@Repository
+@Transactional
+public class ForumDAO {
+    private static final ForumMapper forumMapper = new ForumMapper();
+    private static final ForumUserMapper forumUserMapper = new ForumUserMapper();
 
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
-    public ForumDAO(JdbcTemplate jdbcTemplate) {
+    @Autowired
+    public ForumDAO(JdbcTemplate jdbcTemplate){
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void create(ForumModel forum) {
-
-        final String sql = "INSERT INTO forums (title, user_nick, slug, posts, threads) VALUES(?, (SELECT nickname FROM users WHERE LOWER(nickname)=LOWER(?)), ?, ?, ?)";
-
-        jdbcTemplate.update(sql, forum.getTitle(), forum.getUser(), forum.getSlug(), forum.getPosts(), forum.getThreads());
+    public void create(final ForumModel forum) {
+        String sql = "INSERT INTO forums (title, user_id, slug) VALUES(?, ?, ?);";
+        jdbcTemplate.update(sql, forum.getTitle(), forum.getUserId(), forum.getSlug());
     }
 
-    public ForumModel getForumbySlug(String slug) {
-        final String sql = "SELECT * FROM forums WHERE LOWER(slug) = LOWER(?)";
-        List<ForumModel> forums = jdbcTemplate.query(sql, new Object[]{slug}, new ForumDAO.ForumModelMapper());
-
-        return forums.get(0);
+    public ForumModel getBySlug(String slug) {
+        final String sql = "SELECT * FROM forums WHERE LOWER(slug) = LOWER(?);";
+        return jdbcTemplate.queryForObject(sql, forumMapper, slug);
     }
 
-
-    public void createThread(ThreadModel thread) {
-        String sql = "INSERT INTO threads (title, author, forum, message, votes, slug, created) " +
-                "VALUES(?, (SELECT nickname FROM users WHERE LOWER(users.nickname)=LOWER(?)), " +
-                "(SELECT slug FROM forums WHERE LOWER(forums.slug)=LOWER(?)), ?, ? , ? , ?)";
-
-        jdbcTemplate.update(sql, thread.getTitle(), thread.getAuthor(), thread.getForum(), thread.getMessage(), thread.getVotes(), thread.getSlug(), thread.getCreated());
-
-        sql = "UPDATE forums SET threads = threads + 1 WHERE slug = ?"; //todo: сделать keyHolder, обновлять запись в forums по id
-        jdbcTemplate.update(sql, thread.getForum());
-
+    public ForumModel getBySlugWithAuthor(final String slug) {
+        String sql = "SELECT * FROM forums f JOIN users u ON u.id=f.user_id WHERE LOWER(slug) = LOWER(?);";
+        return jdbcTemplate.queryForObject(sql, forumUserMapper, slug);
     }
 
-    public List<ThreadModel> getThreads(String title, String nickname) {
-        String sql = "SELECT * FROM threads WHERE LOWER(title) = LOWER(?) AND LOWER(author) = LOWER(?)";
-        return jdbcTemplate.query(sql, new Object[]{title, nickname}, new ThreadDAO.ThreadModelMapper());
-    }
+    private static final class ForumMapper implements RowMapper<ForumModel> {
+        public ForumModel mapRow(ResultSet rs, int rowNum) throws SQLException {
+            ForumModel forum = new ForumModel();
+            forum.setId(rs.getInt("id"));
+            forum.setTitle(rs.getString("title"));
+            forum.setSlug(rs.getString("slug"));
+            forum.setUserId(rs.getInt("user_id"));
 
-    public List<ThreadModel> getThreadsInForum(String forum) {
-        String sql = "SELECT * FROM threads WHERE LOWER(forum) = LOWER(?) ";
-        return jdbcTemplate.query(sql, new Object[]{forum}, new ThreadDAO.ThreadModelMapper());
-    }
-
-    //TODO: костыль, подумать над уникальностью поля slug. Надо узнать за один запрос, если такой slug есть, то вставлять нельзя.
-//    public List<ThreadModel> getThreadBySlug(String slug) {
-//        String sql = "SELECT * FROM threads WHERE LOWER(slug) = LOWER(?) ";
-//        return jdbcTemplate.query(sql, new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
-//    }
-
-    public List<ThreadModel> getThreads(String slug, String limit, Timestamp since, boolean desc) {
-        StringBuffer sql = new StringBuffer("SELECT * FROM threads WHERE lower(forum) = lower(?)");
-        if (!StringUtils.isEmpty(since)) {
-            if (desc) {
-                sql.append(" AND created <= '").append(since).append("'::TIMESTAMP").append(" ORDER BY created").append(" DESC");
-            } else {
-                sql.append(" AND created >= '").append(since).append("'::TIMESTAMP").append(" ORDER BY created");
-            }
-        } else {
-            if (desc) {
-                sql.append(" ORDER BY created").append(" DESC");
-            } else {
-                sql.append(" ORDER BY created");
-            }
-        }
-
-        if (!StringUtils.isEmpty(limit)) {
-            sql.append(" LIMIT ").append(limit);
-        }
-
-        if (sql.charAt(sql.length() - 1) == ',') {
-            sql.deleteCharAt(sql.length() - 1);
-        }
-
-        List<ThreadModel> list = jdbcTemplate.query(sql.toString(), new Object[]{slug}, new ThreadDAO.ThreadModelMapper());
-        return list;
-    }
-
-    public List<UserModel> getUsersInForum(String forumSlug, Integer limit, String since, boolean desc) {
-        final List<Object> arguments = new ArrayList<>();
-//        Вместо строк c подзапросом
-//        WITH forumThreads (id, author) AS (
-//                SELECT id, author FROM threads t WHERE t.forum = ?)
-//        SELECT DISTINCT author FROM forumThreads
-//                UNION
-//        SELECT DISTINCT author FROM posts p JOIN forumThreads f ON p.thread = f.id;
-        StringBuffer sql = new StringBuffer("SELECT * from users u WHERE nickname IN (" +
-                "SELECT DISTINCT u.nickname FROM users u JOIN posts p on p.author = u.nickname WHERE lower(p.forum) = lower(?)" +
-                " UNION" +
-                "  SELECT DISTINCT u.nickname FROM users u JOIN threads t on t.author = u.nickname WHERE lower(t.forum) = lower(?))");
-
-        //Убрать добавление одного аргумента
-        arguments.add(forumSlug);
-        arguments.add(forumSlug);
-
-        if (since != null) {
-            sql.append(" AND lower(u.nickname)");
-            if (desc)
-                sql.append(" <");
-            else
-                sql.append(" >");
-            sql.append(" lower(?)");
-            arguments.add(since);
-        }
-
-        sql.append(" ORDER BY nickname");
-
-        if (desc) {
-            sql.append(" DESC");
-        }
-
-        if (limit != null) {
-            sql.append(" LIMIT ?");
-            arguments.add(limit);
-        }
-
-        return jdbcTemplate.query(sql.toString(), arguments.toArray(), new UserDAO.UserModelMapper());
-    }
-
-
-    //Преобразование
-    private final class ForumModelMapper implements RowMapper<ForumModel> {
-        @Override
-        public ForumModel mapRow(ResultSet resultSet, int rowNum) throws SQLException {
-            ForumModel forum = new ForumModel(resultSet.getString("title"),
-                    resultSet.getString("user_nick"),
-                    resultSet.getString("slug"),
-                    resultSet.getInt("posts"),
-                    resultSet.getInt("threads"));
             return forum;
-
         }
     }
 
+    private static final class ForumUserMapper implements RowMapper<ForumModel> {
+        public ForumModel mapRow(ResultSet rs, int rowNum) throws SQLException {
+            ForumModel forum = new ForumModel();
+            forum.setId(rs.getInt("id"));
+            forum.setTitle(rs.getString("title"));
+            forum.setUser(rs.getString("nickname"));
+            forum.setSlug(rs.getString("slug"));
+            forum.setUserId(rs.getInt("user_id"));
+            forum.setPosts(rs.getInt("posts"));
+            forum.setThreads(rs.getInt("threads"));
+
+            return forum;
+        }
+    }
 }

@@ -1,36 +1,38 @@
 package application.models;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 
-import java.sql.Timestamp;
-
-/**
- * Created by egor on 11.03.17.
- */
-
-//Аннотация исключает примитивы со значением 0 из сериализации. TODO: Проверить сериализацию, когда надо вернуть нулевое значение
-//@JsonInclude(JsonInclude.Include.NON_DEFAULT)
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class ThreadModel {
+    @JsonProperty
     private int id;
+    @JsonProperty
     private String title;
+    @JsonProperty
     private String author;
-    private String forum;
-    private String message;
-    private int votes;
-    private String slug;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")
-    private Timestamp created;
+    @JsonIgnore
+    private int userId;
+
+    @JsonProperty
+    private String forum;
+
+    @JsonIgnore
+    private int forumId;
+
+    @JsonProperty
+    private String message;
+    @JsonProperty
+    private int votes;
+    @JsonProperty
+    private String slug;
+    private String created;
 
     @JsonCreator
-    public ThreadModel(@JsonProperty("id") int id,
-                       @JsonProperty("title") String title, @JsonProperty("author") String author,
-                       @JsonProperty("forum") String forum, @JsonProperty("message") String message,
-                       @JsonProperty("votes") int votes, @JsonProperty("slug") String slug,
-                       @JsonProperty("created") Timestamp created) {
-
+    public ThreadModel(@JsonProperty("id") int id, @JsonProperty("title") String title,
+                  @JsonProperty("author") String author, @JsonProperty("forum") String forum,
+                  @JsonProperty("message") String message, @JsonProperty("votes") int votes,
+                  @JsonProperty("slug") String slug, @JsonProperty("created") String created) {
         this.id = id;
         this.title = title;
         this.author = author;
@@ -39,6 +41,9 @@ public class ThreadModel {
         this.votes = votes;
         this.slug = slug;
         this.created = created;
+    }
+
+    public ThreadModel() {
     }
 
     public int getId() {
@@ -65,12 +70,28 @@ public class ThreadModel {
         this.author = author;
     }
 
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
     public String getForum() {
         return forum;
     }
 
     public void setForum(String forum) {
         this.forum = forum;
+    }
+
+    public int getForumId() {
+        return forumId;
+    }
+
+    public void setForumId(int forumId) {
+        this.forumId = forumId;
     }
 
     public String getMessage() {
@@ -97,26 +118,12 @@ public class ThreadModel {
         this.slug = slug;
     }
 
-    public Timestamp getCreated() {
+    @JsonFormat(shape=JsonFormat.Shape.STRING, pattern= "yyyy-MM-dd'T'HH:mm:ss.SSS'+03:00'")
+    public String getCreated() {
         return created;
     }
 
-    public void setCreated(Timestamp created) {
+    public void setCreated(String created) {
         this.created = created;
-    }
-
-    @Override
-    public String toString() {
-        StringBuffer str = new StringBuffer();
-        str.append("id: ").append(Integer.toString(id)).append('\n');
-        str.append("title: ").append(title).append('\n');
-        str.append("author: ").append(author).append('\n');
-        str.append("forum: ").append(forum).append('\n');
-        str.append("message: ").append(message).append('\n');
-        str.append("votes: ").append(Integer.toString(votes)).append('\n');
-        str.append("slug: ").append(slug).append('\n');
-        str.append("created: ").append(created.toString()).append('\n');
-
-        return str.toString();
     }
 }

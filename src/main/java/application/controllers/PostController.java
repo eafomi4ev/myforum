@@ -1,96 +1,93 @@
 package application.controllers;
 
 import application.models.ForumModel;
+import application.models.PostDetailsModel;
 import application.models.PostModel;
-import application.models.ThreadModel;
-import application.models.UserModel;
+import application.models.PostUpdateModel;
 import application.services.ForumDAO;
 import application.services.PostDAO;
 import application.services.ThreadDAO;
 import application.services.UserDAO;
-import org.springframework.http.MediaType;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-
-/**
- * Created by egor on 21.03.17.
- */
+import java.util.List;
 
 @RestController
-@RequestMapping(path = "/api/post/{id}")
+@RequestMapping(path = "/api/post")
 public class PostController {
+    private final PostDAO postServiceDAO;
+    private final UserDAO userServiceDAO;
+    private final ThreadDAO threadServiceDAO;
+    private final ForumDAO forumServiceDAO;
 
-    private PostDAO postServiceDAO;
-    private ThreadDAO threadServiceDAO;
-    private UserDAO userServiceDAO;
-    private ForumDAO forumServiceDAO;
-
-    public PostController(PostDAO postServiceDAO, ThreadDAO threadServiceDAO, UserDAO userServiceDAO, ForumDAO forumServiceDAO) {
+    @Autowired
+    PostController(PostDAO postServiceDAO, UserDAO userServiceDAO, ThreadDAO threadServiceDAO, ForumDAO forumServiceDAO) {
         this.postServiceDAO = postServiceDAO;
-        this.threadServiceDAO = threadServiceDAO;
         this.userServiceDAO = userServiceDAO;
+        this.threadServiceDAO = threadServiceDAO;
         this.forumServiceDAO = forumServiceDAO;
     }
 
-    @RequestMapping(path = "/details", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity details(@PathVariable("id") int id, @RequestParam(value = "related", required = false) String related) {
-        PostModel post = null;
+    @Nullable
+    private PostModel getPostDetails(final Integer id) {
+        PostModel post;
         try {
-            post = postServiceDAO.getPostByID(id);
-        } catch (IndexOutOfBoundsException e) {
-            return ResponseEntity.notFound().build();
+            post = postServiceDAO.getById(id);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
+        return post;
+    }
 
+    @GetMapping(path = "/{id}/details")
+    public ResponseEntity getIdDetails(@PathVariable(name = "id") Integer id,
+                                       @RequestParam(name = "related", required = false) List<String> related) {
+        final PostModel post = getPostDetails(id);
         if (post == null) {
             return ResponseEntity.notFound().build();
         }
-        Map<String, Object> map = new HashMap<>();
+
+        final PostDetailsModel postDetails = new PostDetailsModel();
+        postDetails.setPost(post);
 
         if (related != null) {
-            String[] relatedWord = related.split(",");
-
-            for (String word: relatedWord) {
-                if (word.equals("user")) {
-                    UserModel user = userServiceDAO.get(post.getAuthor());
-                    map.put("author", user);
-                }
-
-                if (word.equals("thread")) {
-                    ThreadModel thread = threadServiceDAO.getThreadById(post.getThread()).get(0);
-                    map.put("thread", thread);
-                }
-
-                if (word.equals("forum")) {
-                    ForumModel forum = forumServiceDAO.getForumbySlug(post.getForum());
-                    map.put("forum", forum);
+            for (String item : related) {
+                if (item.equals("user")) {
+                    postDetails.setAuthor(userServiceDAO.get(post.getAuthor()));
+                } else if (item.equals("thread")) {
+                    postDetails.setThread(threadServiceDAO.getByIdWithFullData(post.getThread()));
+                } else if (item.equals("forum")) {
+                    ForumModel forum = forumServiceDAO.getBySlugWithAuthor(post.getForum());
+                    postDetails.setForum(forum);
+                } else {
+                    return ResponseEntity.notFound().build();
                 }
             }
         }
 
-        map.put("post", post);
-        return ResponseEntity.ok(map);
+        return ResponseEntity.ok(postDetails);
     }
 
-    @RequestMapping(path = "/details", method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity detailsUpdate(@PathVariable("id") int id, @RequestBody PostModel post) {
+    @PostMapping(path = "/{id}/details")
+    public ResponseEntity setIdDetails(@PathVariable(name = "id") int id,
+                                       @RequestBody PostUpdateModel postUpdate) {
+
+        final PostModel post = getPostDetails(id);
         if (post == null) {
             return ResponseEntity.notFound().build();
         }
 
-        if (post.getMessage() != null) {
-            try {
-                if (postServiceDAO.detailsUpdate(id, post) == 0) {
-                    return ResponseEntity.notFound().build();
-                }
-            } catch (IndexOutOfBoundsException e) {
-                return ResponseEntity.notFound().build();
-            }
+        if (postUpdate.getMessage() != null) {
+            postServiceDAO.update(post, postUpdate);
         }
-        return ResponseEntity.ok(postServiceDAO.getPostByID(id));
+
+        return ResponseEntity.ok(post);
     }
-
 }
-

@@ -1,44 +1,45 @@
 package application.models;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.sql.Timestamp;
-
-/**
- * Created by egor on 15.03.17.
- */
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class PostModel {
-
+    @JsonProperty
     private int id;
-    private int parent;
+    @JsonProperty
+    private Integer parent = 0;
+    @JsonProperty
+    private boolean isEdited;
+    @JsonProperty
     private String author;
-    private String message;
-
-    private Boolean isEdited;
-
+    @JsonProperty
     private String forum;
+    @JsonProperty
+    private String message;
+    @JsonProperty
     private int thread;
+    @JsonProperty
+    private String created;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")
-    private Timestamp created;
+    private int forumId;
+    private int userId;
 
-    public PostModel(@JsonProperty("id") int id, @JsonProperty("parent") int parent, @JsonProperty("author") String author,
-                     @JsonProperty("message") String message, @JsonProperty("isEdited") boolean isEdited,
-                     @JsonProperty("forum") String forum, @JsonProperty("thread") int thread,
-                     @JsonProperty("created") Timestamp created) {
-
+    @JsonCreator
+    public PostModel(@JsonProperty("id") int id, @JsonProperty("parent") int parent,
+                @JsonProperty("author") String author, @JsonProperty("message") String message,
+                @JsonProperty("isEdited") boolean isEdited, @JsonProperty("forum") String forum,
+                @JsonProperty("thread") int thread, @JsonProperty("created") String created ){
         this.id = id;
         this.parent = parent;
         this.author = author;
-        this.message = message;
-        this.isEdited = isEdited;
         this.forum = forum;
+        this.message = message;
         this.thread = thread;
+        this.isEdited = isEdited;
         this.created = created;
+    }
+
+    public PostModel(){
     }
 
     public int getId() {
@@ -49,12 +50,20 @@ public class PostModel {
         this.id = id;
     }
 
-    public int getParent() {
+    public Integer getParent() {
         return parent;
     }
 
-    public void setParent(int parent) {
+    public void setParent(Integer parent) {
         this.parent = parent;
+    }
+
+    public boolean getIsEdited() {
+        return isEdited;
+    }
+
+    public void setIsEdited(boolean edited) {
+        isEdited = edited;
     }
 
     public String getAuthor() {
@@ -65,28 +74,20 @@ public class PostModel {
         this.author = author;
     }
 
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public boolean getIsEdited() {
-        return this.isEdited;
-    }
-
-    public void setIsEdited(boolean isEdited) {
-        this.isEdited = isEdited;
-    }
-
     public String getForum() {
         return forum;
     }
 
     public void setForum(String forum) {
         this.forum = forum;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 
     public int getThread() {
@@ -97,11 +98,27 @@ public class PostModel {
         this.thread = thread;
     }
 
-    public Timestamp getCreated() {
+    public String getCreated() {
         return created;
     }
 
-    public void setCreated(Timestamp created) {
+    public void setCreated(String created) {
         this.created = created;
+    }
+
+    public int getForumId() {
+        return forumId;
+    }
+
+    public void setForumId(int forumId) {
+        this.forumId = forumId;
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
     }
 }
